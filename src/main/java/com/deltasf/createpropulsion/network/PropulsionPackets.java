@@ -10,6 +10,7 @@ import com.deltasf.createpropulsion.physics_assembler.packets.GaugeInsertionErro
 import com.deltasf.createpropulsion.physics_assembler.packets.GaugeUsedPacket;
 import com.deltasf.createpropulsion.physics_assembler.packets.ResetGaugePacket;
 
+import com.deltasf.createpropulsion.propeller.blades.SyncBladePropertiesPacket;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.level.chunk.LevelChunk;
@@ -86,6 +87,12 @@ public class PropulsionPackets {
             .decoder(BalloonUpdatePacket::decode)
             .consumerMainThread(BalloonUpdatePacket::handle)
             .add();
+
+        INSTANCE.messageBuilder(SyncBladePropertiesPacket.class, id(), NetworkDirection.PLAY_TO_CLIENT)
+                .encoder(SyncBladePropertiesPacket::encode)
+                .decoder(SyncBladePropertiesPacket::decode)
+                .consumerMainThread(SyncBladePropertiesPacket::handle)
+                .add();
     }
 
     public static <MSG> void sendToPlayer(MSG message, ServerPlayer player) {
