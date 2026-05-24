@@ -21,10 +21,6 @@ import com.deltasf.createpropulsion.balloons.utils.BalloonRegistryUtility;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.AABB;
-import org.valkyrienskies.core.api.util.AerodynamicUtils;
-import org.valkyrienskies.core.api.world.ServerShipWorld;
-import org.valkyrienskies.mod.api.ValkyrienSkies;
-import org.valkyrienskies.mod.common.ValkyrienSkiesMod;
 
 //"Solver" word is a bit of an overkill, but it sounds cooler this way :D
 public class HotAirSolver {

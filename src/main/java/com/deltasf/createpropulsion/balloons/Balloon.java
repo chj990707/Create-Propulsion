@@ -11,15 +11,21 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Collectors;
 
 import com.deltasf.createpropulsion.balloons.registries.BalloonRegistry;
 
+import com.mojang.logging.LogUtils;
 import it.unimi.dsi.fastutil.ints.Int2IntMap;
 import it.unimi.dsi.fastutil.ints.Int2IntOpenHashMap;
 import it.unimi.dsi.fastutil.longs.LongIterator;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.SectionPos;
+import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.AABB;
+import org.valkyrienskies.mod.common.VSGameUtilsKt;
 
 public class Balloon implements Iterable<BlockPos> {
     public static final int CHUNK_SIZE = 3;
@@ -36,6 +42,7 @@ public class Balloon implements Iterable<BlockPos> {
     //Force chunks
     private final ConcurrentHashMap<ChunkKey, BalloonForceChunk> chunkMap = new ConcurrentHashMap<>();
     private final Set<ChunkKey> dirtyChunks = new HashSet<>();
+    private final Set<ChunkPos> levelChunkPos = new HashSet<>();
     //Validation data
     private Set<UUID> supportHais;
     private Set<BlockPos> holes = new HashSet<>();
@@ -84,6 +91,13 @@ public class Balloon implements Iterable<BlockPos> {
 
     public Iterable<BlockPos> getVolume() {
         return this;
+    }
+
+    public boolean isTicking(Level level) {
+        for (ChunkPos pos : levelChunkPos) {
+            if(!VSGameUtilsKt.isTickingChunk(level, pos)) return false;
+        }
+        return true;
     }
 
     public LongOpenHashSet getVolumeForSerialization() {
@@ -404,6 +418,10 @@ public class Balloon implements Iterable<BlockPos> {
             boundsCache = new AABB(0,0,0,0,0,0);
             return;
         }
+        levelChunkPos.clear();
+        ChunkPos chunkStart = new ChunkPos(new BlockPos(minX, minY, minZ));
+        ChunkPos chunkEnd = new ChunkPos(new BlockPos(maxX, maxY, maxZ));
+        ChunkPos.rangeClosed(chunkStart, chunkEnd).forEach(levelChunkPos::add);
         boundsCache = new AABB((double) minX,     (double) minY,     (double) minZ,
                                (double) maxX + 1, (double) maxY + 1, (double) maxZ + 1);
     }

@@ -9,6 +9,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
+import com.mojang.logging.LogUtils;
 import org.valkyrienskies.core.api.ships.ServerShip;
 import org.valkyrienskies.mod.common.VSGameUtilsKt;
 
@@ -92,6 +93,9 @@ public class HaiGroup {
     public void tickBalloons(Level level, BalloonRegistry registry) {
         final List<Balloon> balloonsToKill = new ArrayList<>();
         for(Balloon balloon : balloons) {
+            if (!balloon.isTicking(level)) {
+                continue;
+            }
             if (HotAirSolver.tickBalloon(level, balloon, this, registry, ship)) {
                 balloonsToKill.add(balloon);
             }
