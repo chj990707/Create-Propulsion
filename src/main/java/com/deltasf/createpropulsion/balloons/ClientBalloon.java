@@ -118,9 +118,9 @@ public class ClientBalloon {
         countAtZ.put(z, prevZ + 1);
 
         if (!boundsInitialized) {
-            minX = maxX = x;
-            minY = maxY = y;
-            minZ = maxZ = z;
+            minX = (maxX = x);
+            minY = (maxY = y);
+            minZ = (maxZ = z);
             boundsInitialized = true;
             updateBoundsCache();
             return;

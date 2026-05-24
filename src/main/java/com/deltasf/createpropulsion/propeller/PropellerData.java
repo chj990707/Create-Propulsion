@@ -3,8 +3,6 @@ package com.deltasf.createpropulsion.propeller;
 import com.fasterxml.jackson.annotation.JsonAutoDetect;
 import org.joml.Vector3d;
 
-import com.deltasf.createpropulsion.atmosphere.AtmosphereData;
-
 @JsonAutoDetect(
         fieldVisibility = JsonAutoDetect.Visibility.ANY
 )
@@ -16,7 +14,6 @@ public class PropellerData {
     private volatile float torque;
     private volatile Vector3d direction;
     private volatile boolean invertDirection;
-    private volatile AtmosphereData atmosphere;
 
     public float getThrust() { return thrust; }
     public void setThrust(float thrust) { this.thrust = thrust; }
@@ -29,7 +26,4 @@ public class PropellerData {
 
     public boolean getInvertDirection() { return invertDirection; }
     public void setInvertDirection(boolean invertDirection) { this.invertDirection = invertDirection; }
-    
-    public AtmosphereData getAtmosphere() {return atmosphere;};
-    public void setAtmosphere(AtmosphereData atmosphere) { this.atmosphere = atmosphere; }
 }

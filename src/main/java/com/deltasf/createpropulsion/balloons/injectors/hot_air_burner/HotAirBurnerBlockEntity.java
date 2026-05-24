@@ -5,6 +5,7 @@ import java.util.UUID;
 
 import javax.annotation.Nullable;
 
+import com.deltasf.createpropulsion.balloons.hot_air.HotAirSolver;
 import com.simibubi.create.api.equipment.goggles.IHaveGoggleInformation;
 import com.simibubi.create.foundation.utility.CreateLang;
 import net.createmod.catnip.lang.LangBuilder;
@@ -13,7 +14,6 @@ import org.valkyrienskies.core.api.ships.Ship;
 import org.valkyrienskies.mod.common.VSGameUtilsKt;
 
 import com.deltasf.createpropulsion.PropulsionConfig;
-import com.deltasf.createpropulsion.atmosphere.DimensionAtmosphereManager;
 import com.deltasf.createpropulsion.balloons.Balloon;
 import com.deltasf.createpropulsion.balloons.injectors.AirInjectorObstructionBehaviour;
 import com.deltasf.createpropulsion.balloons.injectors.BalloonInfoBehaviour;
@@ -243,7 +243,6 @@ public class HotAirBurnerBlockEntity extends SmartBlockEntity implements IHaveGo
     public boolean addToGoggleTooltip(List<Component> tooltip, boolean isPlayerSneaking) {
         boolean hasFuel = !fuelInventory.fuelStack.isEmpty();
         boolean isBurning = burnTime > 0;
-        boolean isAirless = level != null && DimensionAtmosphereManager.getData(level).isAirless();
         boolean isBalloonPresent = balloonInfoBehaviour.isBalloonPresent();
 
         //Status
@@ -251,10 +250,11 @@ public class HotAirBurnerBlockEntity extends SmartBlockEntity implements IHaveGo
         ChatFormatting color = null;
 
         //Airless -> Not on ship -> No balloon / Fuel -> Valid statuses
-        if (isAirless) {
-            key = "createpropulsion.gui.goggles.hot_air_burner.status.airless";
-            color = ChatFormatting.RED;
-        } else if (!VSGameUtilsKt.isBlockInShipyard(getLevel(), getBlockPos())) {
+//        if (isAirless) {
+//            key = "createpropulsion.gui.goggles.hot_air_burner.status.airless";
+//            color = ChatFormatting.RED;
+//        }
+        if (!VSGameUtilsKt.isBlockInShipyard(getLevel(), getBlockPos())) {
             key = "createpropulsion.gui.goggles.hot_air_burner.status.not_shipified";
             color = ChatFormatting.RED;
         } else if (!isBalloonPresent) {
@@ -291,14 +291,9 @@ public class HotAirBurnerBlockEntity extends SmartBlockEntity implements IHaveGo
             CreateLang.builder().add(fuelName).space().add(fuelCount).forGoggles(tooltip);
         }
 
-        //Balloon section
-        if (isAirless) {
-            return true;
-        }
-
-        if (hasFuel && isBalloonPresent) {
-            CreateLang.text("").forGoggles(tooltip);
-        }
+//        if (hasFuel && isBalloonPresent) {
+//            CreateLang.text("").forGoggles(tooltip);
+//        }
 
         balloonInfoBehaviour.addBalloonTooltip(tooltip, isPlayerSneaking);
         obstructionBehaviour.displayObstructionOutline("HotAirBurnerObstruction");

@@ -24,7 +24,7 @@ public final class PropellerAttachment implements ShipPhysicsListener {
     public void physTick(@NotNull PhysShip physicShip, @NotNull PhysLevel physLevel) {
         PhysShipImpl ship = (PhysShipImpl)physicShip;
         appliersMapping.forEach((pos, applier) -> {
-            applier.applyForces(BlockPos.of(pos), ship);
+            applier.applyForces(BlockPos.of(pos), ship, physLevel);
         });
     }
 

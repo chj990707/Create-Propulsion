@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
+import kotlin.Triple;
 import org.joml.Quaterniond;
 import org.joml.Vector3d;
 import org.valkyrienskies.core.api.ships.ServerShip;
@@ -11,8 +12,6 @@ import org.valkyrienskies.core.api.ships.ServerShip;
 import java.lang.Math;
 
 import com.deltasf.createpropulsion.PropulsionConfig;
-import com.deltasf.createpropulsion.atmosphere.AtmosphereData;
-import com.deltasf.createpropulsion.atmosphere.DimensionAtmosphereManager;
 import com.deltasf.createpropulsion.balloons.Balloon;
 import com.deltasf.createpropulsion.balloons.HaiGroup;
 import com.deltasf.createpropulsion.balloons.injectors.IHotAirInjector;
@@ -22,6 +21,10 @@ import com.deltasf.createpropulsion.balloons.utils.BalloonRegistryUtility;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.AABB;
+import org.valkyrienskies.core.api.util.AerodynamicUtils;
+import org.valkyrienskies.core.api.world.ServerShipWorld;
+import org.valkyrienskies.mod.api.ValkyrienSkies;
+import org.valkyrienskies.mod.common.ValkyrienSkiesMod;
 
 //"Solver" word is a bit of an overkill, but it sounds cooler this way :D
 public class HotAirSolver {
@@ -35,11 +38,6 @@ public class HotAirSolver {
     static final double upsideDownLeakFactor = 10.0;
 
     public static boolean tickBalloon(Level level, Balloon balloon, HaiGroup group, BalloonRegistry registry, ServerShip ship) {
-        if (isInAirlessAtmosphere(level)) {
-            balloon.hotAir = 0.0;
-            balloon.isInvalid = true;
-            return true;
-        }
 
         if (balloon.isEmpty()) { return true; } //Dead in a moment
         
@@ -172,11 +170,6 @@ public class HotAirSolver {
             this.height = bounds.maxY - bounds.minY;
             this.pressureFloor = bounds.maxY - (this.height * this.fullness) + 1e-6;
         }
-    }
-
-    private static boolean isInAirlessAtmosphere(Level level) {
-        AtmosphereData atmosphere = DimensionAtmosphereManager.getData(level);
-        return atmosphere.isAirless();
     }
 
     private static double downRamp(double v, double threshold) {

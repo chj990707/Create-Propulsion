@@ -11,7 +11,6 @@ import org.jetbrains.annotations.NotNull;
 import org.valkyrienskies.mod.common.util.VectorConversionsMCKt;
 
 import com.deltasf.createpropulsion.PropulsionConfig;
-import com.deltasf.createpropulsion.atmosphere.DimensionAtmosphereManager;
 import com.deltasf.createpropulsion.propeller.blades.PropellerBladeItem;
 import com.deltasf.createpropulsion.propeller.rendering.PropellerRenderer;
 import com.deltasf.createpropulsion.utility.math.MathUtility;
@@ -88,7 +87,6 @@ public class PropellerBlockEntity extends KineticBlockEntity {
             if (ship != null) {
                 propellerData.setDirection(VectorConversionsMCKt.toJOMLD(state.getValue(PropellerBlock.FACING).getNormal()));
                 propellerData.setThrust(0);
-                propellerData.setAtmosphere(DimensionAtmosphereManager.getData(level));
                 PropellerForceApplier applier = new PropellerForceApplier(propellerData);
                 ship.addApplier(worldPosition, applier);
             }
