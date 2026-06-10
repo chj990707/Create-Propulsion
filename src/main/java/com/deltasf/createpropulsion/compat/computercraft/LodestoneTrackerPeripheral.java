@@ -1,12 +1,11 @@
 package com.deltasf.createpropulsion.compat.computercraft;
 
 import com.deltasf.createpropulsion.lodestone_tracker.LodestoneTrackerBlockEntity;
-import com.simibubi.create.compat.computercraft.implementation.peripherals.SyncedPeripheral;
 
 import dan200.computercraft.api.lua.LuaFunction;
 import dan200.computercraft.api.peripheral.IPeripheral;
 
-public class LodestoneTrackerPeripheral extends SyncedPeripheral<LodestoneTrackerBlockEntity> {
+public class LodestoneTrackerPeripheral extends AbstractSyncedTargetPeripheral<LodestoneTrackerBlockEntity> {
     public LodestoneTrackerPeripheral(LodestoneTrackerBlockEntity blockEntity) {
         super(blockEntity);
     }

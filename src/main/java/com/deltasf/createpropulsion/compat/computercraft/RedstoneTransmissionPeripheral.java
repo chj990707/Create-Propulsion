@@ -2,12 +2,11 @@ package com.deltasf.createpropulsion.compat.computercraft;
 
 import com.deltasf.createpropulsion.redstone_transmission.RedstoneTransmissionBlockEntity;
 import com.deltasf.createpropulsion.redstone_transmission.RedstoneTransmissionBlockEntity.TransmissionMode;
-import com.simibubi.create.compat.computercraft.implementation.peripherals.SyncedPeripheral;
 
 import dan200.computercraft.api.lua.LuaException;
 import dan200.computercraft.api.lua.LuaFunction;
 
-public class RedstoneTransmissionPeripheral extends SyncedPeripheral<RedstoneTransmissionBlockEntity>  {
+public class RedstoneTransmissionPeripheral extends AbstractSyncedTargetPeripheral<RedstoneTransmissionBlockEntity> {
     public RedstoneTransmissionPeripheral(RedstoneTransmissionBlockEntity blockEntity) {
         super(blockEntity);
     }

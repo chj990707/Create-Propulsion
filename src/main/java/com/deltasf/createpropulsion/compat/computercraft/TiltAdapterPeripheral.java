@@ -3,11 +3,10 @@ package com.deltasf.createpropulsion.compat.computercraft;
 import com.deltasf.createpropulsion.PropulsionConfig;
 import com.deltasf.createpropulsion.tilt_adapter.TiltAdapterBlockEntity;
 import com.deltasf.createpropulsion.utility.math.MathUtility;
-import com.simibubi.create.compat.computercraft.implementation.peripherals.SyncedPeripheral;
 
 import dan200.computercraft.api.lua.LuaFunction;
 
-public class TiltAdapterPeripheral extends SyncedPeripheral<TiltAdapterBlockEntity> {
+public class TiltAdapterPeripheral extends AbstractSyncedTargetPeripheral<TiltAdapterBlockEntity> {
     public TiltAdapterPeripheral(TiltAdapterBlockEntity blockEntity) {
         super(blockEntity);
     }

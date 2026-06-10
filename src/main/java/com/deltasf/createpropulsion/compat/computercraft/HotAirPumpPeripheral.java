@@ -11,12 +11,11 @@ import com.deltasf.createpropulsion.balloons.hot_air.HotAirSolver;
 import com.deltasf.createpropulsion.balloons.injectors.hot_air_pump.HotAirPumpBlockEntity;
 import com.deltasf.createpropulsion.balloons.registries.BalloonRegistry;
 import com.deltasf.createpropulsion.balloons.registries.BalloonShipRegistry;
-import com.simibubi.create.compat.computercraft.implementation.peripherals.SyncedPeripheral;
 
 import dan200.computercraft.api.lua.LuaFunction;
 import net.minecraft.world.level.Level;
 
-public class HotAirPumpPeripheral extends SyncedPeripheral<HotAirPumpBlockEntity> {
+public class HotAirPumpPeripheral extends AbstractSyncedTargetPeripheral<HotAirPumpBlockEntity> {
     public HotAirPumpPeripheral(HotAirPumpBlockEntity blockEntity) {
         super(blockEntity);
     }

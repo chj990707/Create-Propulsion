@@ -3,12 +3,11 @@ package com.deltasf.createpropulsion.compat.computercraft;
 import org.joml.Math;
 
 import com.deltasf.createpropulsion.optical_sensors.OpticalSensorBlockEntity;
-import com.simibubi.create.compat.computercraft.implementation.peripherals.SyncedPeripheral;
 
 import dan200.computercraft.api.lua.LuaFunction;
 import dan200.computercraft.api.peripheral.IPeripheral;
 
-public class OpticalSensorPeripheral extends SyncedPeripheral<OpticalSensorBlockEntity> {
+public class OpticalSensorPeripheral extends AbstractSyncedTargetPeripheral<OpticalSensorBlockEntity> {
     public OpticalSensorPeripheral(OpticalSensorBlockEntity blockEntity) {
         super(blockEntity);
     }

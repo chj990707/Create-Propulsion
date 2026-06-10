@@ -1,12 +1,11 @@
 package com.deltasf.createpropulsion.compat.computercraft;
 
 import com.deltasf.createpropulsion.physics_assembler.PhysicsAssemblerBlockEntity;
-import com.simibubi.create.compat.computercraft.implementation.peripherals.SyncedPeripheral;
 
 import dan200.computercraft.api.lua.LuaFunction;
 import dan200.computercraft.api.peripheral.IPeripheral;
 
-public class PhysicsAssemblerPeripheral extends SyncedPeripheral<PhysicsAssemblerBlockEntity> {
+public class PhysicsAssemblerPeripheral extends AbstractSyncedTargetPeripheral<PhysicsAssemblerBlockEntity> {
     public PhysicsAssemblerPeripheral(PhysicsAssemblerBlockEntity blockEntity) {
         super(blockEntity);
     }

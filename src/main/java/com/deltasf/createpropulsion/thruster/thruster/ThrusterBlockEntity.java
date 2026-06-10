@@ -44,7 +44,7 @@ public class ThrusterBlockEntity extends AbstractThrusterBlockEntity {
 
     @Override
     public <T> LazyOptional<T> getCapability(Capability<T> cap, @Nullable Direction side) {
-        if (cap == ForgeCapabilities.FLUID_HANDLER && side == getFluidCapSide()) {
+        if (cap == ForgeCapabilities.FLUID_HANDLER && (side == getFluidCapSide() || side == null)) {
             return tank.getCapability().cast();
         }
         if (PropulsionCompatibility.CC_ACTIVE && computerBehaviour.isPeripheralCap(cap)) {
