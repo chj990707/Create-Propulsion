@@ -2,10 +2,7 @@ package com.deltasf.createpropulsion.mixin.plugin;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.function.Supplier;
 
 import org.objectweb.asm.ClassReader;
@@ -26,6 +23,18 @@ public class PropulsionMixinPlugin implements IMixinConfigPlugin {
 
     static {
         CONDITIONS.put("is_vsaddition_not_loaded", () -> FMLLoader.getLoadingModList().getModFileById("vs_addition") == null);
+        CONDITIONS.put("is_vs_2.5", () -> {
+            String version = FMLLoader.getLoadingModList().getModFileById("valkyrienskies").versionString();
+            String[] versionSplit = version.split("\\.");
+            try {
+                int major = Integer.parseInt(versionSplit[0]);
+                int minor = Integer.parseInt(versionSplit[1]);
+                return major >= 2 && minor >= 5;
+            } catch (NumberFormatException e) {
+                LogUtils.getLogger().warn("VS2 version could not be parsed: {}", version);
+            }
+            return false;
+        });
     }
 
     @Override
