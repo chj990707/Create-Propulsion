@@ -12,13 +12,12 @@
       "feature.tilt_adapter.SequenceContextMixin"
     ],
     "client": [
-      "feature.MixinMinecraft",
       "feature.compass.CompassItemPropertyFunctionMixin",
-      "rendering.DrawManagerAccessor",
+      "rendering.LevelRendererMixin",
       "rendering.EngineImplMixin",
+      "rendering.DrawManagerAccessor",
       "rendering.InstancedDrawManagerMixin",
-      "rendering.InstancedInstancerMixin",
-      "rendering.LevelRendererMixin"
+      "rendering.InstancedInstancerMixin"
     ],
     "server": [],
     "injectors": {
