@@ -1,0 +1,32 @@
+{
+  "prop_loop": {
+    "subtitle": "sounds.createpropulsion.prop_loop",
+    "sounds": [
+      {
+        "name": "createpropulsion:prop_loop_1",
+        "type": "file",
+        "attenuation_distance": 16
+      },
+      {
+        "name": "createpropulsion:prop_loop_2",
+        "type": "file",
+        "attenuation_distance": 16
+      },
+      {
+        "name": "createpropulsion:prop_loop_3",
+        "type": "file",
+        "attenuation_distance": 16
+      },
+      {
+        "name": "createpropulsion:prop_loop_4",
+        "type": "file",
+        "attenuation_distance": 16
+      },
+      {
+        "name": "createpropulsion:prop_loop_5",
+        "type": "file",
+        "attenuation_distance": 16
+      }
+    ]
+  }
+}

@@ -6,7 +6,11 @@ import java.util.Optional;
 
 import javax.annotation.Nullable;
 
+import com.mojang.logging.LogUtils;
 import net.createmod.catnip.animation.AnimationTickHolder;
+import net.minecraft.client.Minecraft;
+import net.minecraftforge.api.distmarker.Dist;
+import net.minecraftforge.api.distmarker.OnlyIn;
 import org.jetbrains.annotations.NotNull;
 import org.valkyrienskies.mod.common.util.VectorConversionsMCKt;
 
@@ -55,6 +59,7 @@ public class PropellerBlockEntity extends KineticBlockEntity {
     public List<Float> prevBladeAngles;
     public List<Float> renderedBladeAngles;
     public float animationStartTime;
+    protected PropellerSoundInstance soundInstance;
 
     public float visualRPM = 0f;
     public float visualAngle = 0f;
@@ -80,6 +85,8 @@ public class PropellerBlockEntity extends KineticBlockEntity {
         if (level.isClientSide) {
             if (prevBladeAngles == null) prevBladeAngles = new ArrayList<>();
             if (renderedBladeAngles == null) renderedBladeAngles = new ArrayList<>();
+            soundInstance = new PropellerSoundInstance(this);
+            Minecraft.getInstance().getSoundManager().queueTickingSound(soundInstance);
         } else {
             BlockState state = getBlockState();
 
@@ -131,6 +138,12 @@ public class PropellerBlockEntity extends KineticBlockEntity {
         if (getSpeed() != prevSpeed) {
             updateThrust();
         }
+    }
+
+    @OnlyIn(Dist.CLIENT)
+    @Override
+    public void tickAudio() {
+        super.tickAudio();
     }
 
     public float getTargetRPM() {
@@ -449,5 +462,6 @@ public class PropellerBlockEntity extends KineticBlockEntity {
     public void invalidate() {
         super.invalidate();
         itemHandler.invalidate();
+        if (soundInstance != null) Minecraft.getInstance().getSoundManager().stop(soundInstance);
     }
 }
