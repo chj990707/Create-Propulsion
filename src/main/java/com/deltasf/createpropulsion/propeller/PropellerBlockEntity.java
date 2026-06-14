@@ -59,7 +59,8 @@ public class PropellerBlockEntity extends KineticBlockEntity {
     public List<Float> prevBladeAngles;
     public List<Float> renderedBladeAngles;
     public float animationStartTime;
-    protected PropellerSoundInstance soundInstance;
+    protected PropellerSoundInstance soundInstance_low;
+    protected PropellerSoundInstance soundInstance_high;
 
     public float visualRPM = 0f;
     public float visualAngle = 0f;
@@ -85,8 +86,10 @@ public class PropellerBlockEntity extends KineticBlockEntity {
         if (level.isClientSide) {
             if (prevBladeAngles == null) prevBladeAngles = new ArrayList<>();
             if (renderedBladeAngles == null) renderedBladeAngles = new ArrayList<>();
-            soundInstance = new PropellerSoundInstance(this);
-            Minecraft.getInstance().getSoundManager().queueTickingSound(soundInstance);
+            soundInstance_low = new PropellerSoundInstance(this, 0);
+            soundInstance_high = new PropellerSoundInstance(this, 1);
+            Minecraft.getInstance().getSoundManager().queueTickingSound(soundInstance_low);
+            Minecraft.getInstance().getSoundManager().queueTickingSound(soundInstance_high);
         } else {
             BlockState state = getBlockState();
 
@@ -144,6 +147,23 @@ public class PropellerBlockEntity extends KineticBlockEntity {
     @Override
     public void tickAudio() {
         super.tickAudio();
+        if (soundInstance_high.isTooHigh()) {
+            int newLow = soundInstance_low.frequencyOrdinal - 1;
+            if (newLow >= 0) {
+                Minecraft.getInstance().getSoundManager().stop(soundInstance_high);
+                soundInstance_high = soundInstance_low;
+                soundInstance_low = new PropellerSoundInstance(this, newLow);
+                Minecraft.getInstance().getSoundManager().queueTickingSound(soundInstance_low);
+            }
+        } else if (soundInstance_low.isTooLow()) {
+            int newHigh = soundInstance_high.frequencyOrdinal + 1;
+            if (newHigh <= PropellerSoundInstance.MAX_FREQ_ORDINAL) {
+                Minecraft.getInstance().getSoundManager().stop(soundInstance_low);
+                soundInstance_low = soundInstance_high;
+                soundInstance_high = new PropellerSoundInstance(this, newHigh);
+                Minecraft.getInstance().getSoundManager().queueTickingSound(soundInstance_high);
+            }
+        }
     }
 
     public float getTargetRPM() {
@@ -462,6 +482,7 @@ public class PropellerBlockEntity extends KineticBlockEntity {
     public void invalidate() {
         super.invalidate();
         itemHandler.invalidate();
-        if (soundInstance != null) Minecraft.getInstance().getSoundManager().stop(soundInstance);
+        if (soundInstance_low != null) Minecraft.getInstance().getSoundManager().stop(soundInstance_low);
+        if (soundInstance_high != null) Minecraft.getInstance().getSoundManager().stop(soundInstance_high);
     }
 }

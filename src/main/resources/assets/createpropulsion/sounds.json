@@ -1,31 +1,61 @@
 {
-  "prop_loop": {
+  "prop_1" : {
     "subtitle": "sounds.createpropulsion.prop_loop",
     "sounds": [
       {
-        "name": "createpropulsion:prop_loop_1",
+        "name": "createpropulsion:prop_2_5_hz",
         "type": "file",
-        "attenuation_distance": 16
-      },
+        "attenuation_distance": 32
+      }
+    ]
+  },
+  "prop_2" : {
+    "subtitle": "sounds.createpropulsion.prop_loop",
+    "sounds": [
       {
-        "name": "createpropulsion:prop_loop_2",
+        "name": "createpropulsion:prop_5_hz",
         "type": "file",
-        "attenuation_distance": 16
-      },
+        "attenuation_distance": 32
+      }
+    ]
+  },
+  "prop_3" : {
+    "subtitle": "sounds.createpropulsion.prop_loop",
+    "sounds": [
       {
-        "name": "createpropulsion:prop_loop_3",
+        "name": "createpropulsion:prop_10_hz",
         "type": "file",
-        "attenuation_distance": 16
-      },
+        "attenuation_distance": 32
+      }
+    ]
+  },
+  "prop_4" : {
+    "subtitle": "sounds.createpropulsion.prop_loop",
+    "sounds": [
       {
-        "name": "createpropulsion:prop_loop_4",
+        "name": "createpropulsion:prop_20_hz",
         "type": "file",
-        "attenuation_distance": 16
-      },
+        "attenuation_distance": 32
+      }
+    ]
+  },
+  "prop_5" : {
+    "subtitle": "sounds.createpropulsion.prop_loop",
+    "sounds": [
       {
-        "name": "createpropulsion:prop_loop_5",
+        "name": "createpropulsion:prop_40_hz",
         "type": "file",
-        "attenuation_distance": 16
+        "attenuation_distance": 32
+      }
+    ]
+  },
+  "prop_6" : {
+    "subtitle": "sounds.createpropulsion.prop_loop",
+    "sounds": [
+      {
+        "name": "createpropulsion:prop_80_hz",
+        "type": "file",
+        "attenuation_distance": 32
       }
     ]
   }

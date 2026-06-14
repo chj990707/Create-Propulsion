@@ -269,5 +269,7 @@
     "createpropulsion.ponder.shared.burner.redstone_thermostat": "Applying a Redstone signal will disable the thermostat",
     "createpropulsion.ponder.shared.burner.constant_consumption": "While disabled, fuel is consumed at a constant rate, even without a consumer on top",
     "createpropulsion.ponder.shared.burner.status.hot": "§fBurner Status: §6Hot",
-    "createpropulsion.ponder.shared.burner.status.searing": "§fBurner Status: §cSearing"
+    "createpropulsion.ponder.shared.burner.status.searing": "§fBurner Status: §cSearing",
+
+    "sounds.createpropulsion.prop_loop": "Propeller spinning"
 }
