@@ -62,11 +62,10 @@ public class PropellerSoundInstance extends AbstractTickableSoundInstance {
             pitch = newPitch;
             volume = Math.max(0.0f, (1.0f - (float) Math.abs(Math.log(newPitch) / Math.log(2.0)))) * getVolumeLevel(bladeFreq);
         }
-        LogUtils.getLogger().info("source freq {}, blade freq {}, volume {}", frequency, bladeFreq, volume);
     }
 
     public float getVolumeLevel(float bladeFreq) {
-        return (float) Math.max(0.0, Math.log(bladeFreq / MIN_FREQ) / Math.log(MAX_FREQ / MIN_FREQ));
+        return (float) Math.sqrt(Math.max(0.0, (bladeFreq - MIN_FREQ) / (MAX_FREQ - MIN_FREQ)));
     }
 
     public boolean isTooLow() { return tooLow; }
