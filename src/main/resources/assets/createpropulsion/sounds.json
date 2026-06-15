@@ -58,5 +58,15 @@
         "attenuation_distance": 32
       }
     ]
+  },
+  "thruster_loop" : {
+    "subtitle": "sounds.createpropulsion.thruster_loop",
+    "sounds": [
+      {
+        "name": "createpropulsion:thruster_loop",
+        "type": "file",
+        "attenuation_distance": 32
+      }
+    ]
   }
 }

@@ -14,6 +14,7 @@ import com.simibubi.create.foundation.blockEntity.behaviour.BlockEntityBehaviour
 import com.simibubi.create.foundation.utility.CreateLang;
 import net.createmod.catnip.lang.LangBuilder;
 import net.minecraft.ChatFormatting;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -49,6 +50,8 @@ public abstract class AbstractThrusterBlockEntity extends SmartBlockEntity imple
     protected ThrusterData thrusterData;
     protected int emptyBlocks;
     protected boolean isThrustDirty = false;
+
+    protected ThrusterSoundInstance soundInstance;
 
     //Ticking
     private int currentTick = 0;
@@ -92,6 +95,9 @@ public abstract class AbstractThrusterBlockEntity extends SmartBlockEntity imple
             if (block instanceof AbstractThrusterBlock) {
                 ((AbstractThrusterBlock) block).doRedstoneCheck(level, getBlockState(), worldPosition);
             }
+        } else {
+            soundInstance = new ThrusterSoundInstance(this);
+            Minecraft.getInstance().getSoundManager().queueTickingSound(soundInstance);
         }
     }
 
@@ -359,5 +365,11 @@ public abstract class AbstractThrusterBlockEntity extends SmartBlockEntity imple
         if (compound.contains("ControlMode")) {
             controlMode = ControlMode.values()[compound.getInt("ControlMode")];
         }
+    }
+
+    @Override
+    public void invalidate() {
+        super.invalidate();
+        if (soundInstance != null) Minecraft.getInstance().getSoundManager().stop(soundInstance);
     }
 }
