@@ -14,7 +14,9 @@ import com.simibubi.create.foundation.blockEntity.behaviour.BlockEntityBehaviour
 import com.simibubi.create.foundation.utility.CreateLang;
 import net.createmod.catnip.lang.LangBuilder;
 import net.minecraft.ChatFormatting;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
+import net.minecraft.client.sounds.SoundManager;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.particles.ParticleOptions;
@@ -49,6 +51,8 @@ public abstract class AbstractThrusterBlockEntity extends SmartBlockEntity imple
     protected ThrusterData thrusterData;
     protected int emptyBlocks;
     protected boolean isThrustDirty = false;
+
+    protected ThrusterSoundInstance soundInstance;
 
     //Ticking
     private int currentTick = 0;
@@ -93,6 +97,9 @@ public abstract class AbstractThrusterBlockEntity extends SmartBlockEntity imple
                 ((AbstractThrusterBlock) block).doRedstoneCheck(level, getBlockState(), worldPosition);
             }
         }
+        // Client-side sound instances are created lazily from tick() via
+        // ensureSoundInstance() rather than here, so they can stop themselves
+        // (releasing their sound channel) while idle and be revived later.
     }
 
     //Control logic
@@ -160,6 +167,7 @@ public abstract class AbstractThrusterBlockEntity extends SmartBlockEntity imple
         super.tick();
         BlockState currentBlockState = getBlockState();
         if (level.isClientSide) {
+            ensureSoundInstance();
             if (shouldEmitParticles()) {
                 emitParticles(level, worldPosition, currentBlockState);
             }
@@ -204,6 +212,14 @@ public abstract class AbstractThrusterBlockEntity extends SmartBlockEntity imple
     }
 
     protected boolean shouldEmitParticles() {
+        return isPowered() && isWorking();
+    }
+
+    /** The audio counterpart of shouldEmitParticles(): a thruster only hums
+     *  while it is actually producing thrust -- powered AND working (valid
+     *  fuel, and oxidizer for multiblocks). Read by ThrusterSoundInstance
+     *  every tick and by ensureSoundInstance() as the revival gate. */
+    protected boolean shouldPlaySound() {
         return isPowered() && isWorking();
     }
 
@@ -386,5 +402,49 @@ public abstract class AbstractThrusterBlockEntity extends SmartBlockEntity imple
         if (compound.contains("ControlMode")) {
             controlMode = ControlMode.values()[compound.getInt("ControlMode")];
         }
+    }
+
+    // Cooldown between sound revival attempts. A freshly queued instance
+    // sits in the engine's queue for a tick before isActive() reports it,
+    // so retrying every tick would stack duplicate sounds.
+    private int soundRetryCooldown = 0;
+
+    /** Client-side: (re)creates the looping sound instance if this thruster
+     *  should currently emit one and none is LIVE IN THE ENGINE. Liveness
+     *  must be checked against the engine itself (isActive), not just the
+     *  instance's own isStopped flag: the engine drops sounds externally on
+     *  volume slider changes, F3+T, resource reloads, and device changes
+     *  without ever setting that flag. Idle thrusters are not revived at
+     *  all -- between this gate and the instance's own idle-stop, a
+     *  thruster at zero power costs zero of Minecraft's 247 sound
+     *  channels. */
+    public void ensureSoundInstance() {
+        if (level == null || !level.isClientSide) return;
+        if (!shouldEmitSound() || !shouldPlaySound()) return;
+        SoundManager soundManager = Minecraft.getInstance().getSoundManager();
+        if (soundInstance != null && !soundInstance.isStopped() && soundManager.isActive(soundInstance)) {
+            soundRetryCooldown = 0;
+            return;
+        }
+        if (soundRetryCooldown > 0) {
+            soundRetryCooldown--;
+            return;
+        }
+        soundRetryCooldown = 4;
+        soundInstance = new ThrusterSoundInstance(this);
+        soundManager.queueTickingSound(soundInstance);
+    }
+
+    /** Whether this block entity should host a sound instance at all.
+     *  Multiblock-capable thrusters override this to exclude non-controller
+     *  cells, so a 3x3x3 cube costs one sound channel instead of 27. */
+    public boolean shouldEmitSound() {
+        return true;
+    }
+
+    @Override
+    public void invalidate() {
+        super.invalidate();
+        if (soundInstance != null) Minecraft.getInstance().getSoundManager().stop(soundInstance);
     }
 }

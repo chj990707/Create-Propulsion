@@ -2,11 +2,10 @@ package com.deltasf.createpropulsion.compat.computercraft;
 
 import com.deltasf.createpropulsion.heat.engine.StirlingEngineBlockEntity;
 import com.deltasf.createpropulsion.heat.engine.StirlingScrollValueBehaviour;
-import com.simibubi.create.compat.computercraft.implementation.peripherals.SyncedPeripheral;
 
 import dan200.computercraft.api.lua.LuaFunction;
 
-public class StirlingEnginePeripheral extends SyncedPeripheral<StirlingEngineBlockEntity> {
+public class StirlingEnginePeripheral extends AbstractSyncedTargetPeripheral<StirlingEngineBlockEntity> {
     public StirlingEnginePeripheral(StirlingEngineBlockEntity blockEntity) {
         super(blockEntity);
     }

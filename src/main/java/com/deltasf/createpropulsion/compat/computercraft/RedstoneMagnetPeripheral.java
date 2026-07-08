@@ -1,11 +1,10 @@
 package com.deltasf.createpropulsion.compat.computercraft;
 
 import com.deltasf.createpropulsion.magnet.RedstoneMagnetBlockEntity;
-import com.simibubi.create.compat.computercraft.implementation.peripherals.SyncedPeripheral;
 
 import dan200.computercraft.api.lua.LuaFunction;
 
-public class RedstoneMagnetPeripheral extends SyncedPeripheral<RedstoneMagnetBlockEntity> {
+public class RedstoneMagnetPeripheral extends AbstractSyncedTargetPeripheral<RedstoneMagnetBlockEntity> {
     public RedstoneMagnetPeripheral(RedstoneMagnetBlockEntity blockEntity) {
         super(blockEntity);
     }

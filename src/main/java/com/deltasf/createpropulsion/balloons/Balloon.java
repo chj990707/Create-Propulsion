@@ -19,7 +19,11 @@ import it.unimi.dsi.fastutil.ints.Int2IntOpenHashMap;
 import it.unimi.dsi.fastutil.longs.LongIterator;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import net.minecraft.core.BlockPos;
+import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.AABB;
+import net.minecraft.world.phys.Vec3;
+import org.valkyrienskies.mod.common.VSGameUtilsKt;
 
 public class Balloon implements Iterable<BlockPos> {
     public static final int CHUNK_SIZE = 3;
@@ -84,6 +88,13 @@ public class Balloon implements Iterable<BlockPos> {
 
     public Iterable<BlockPos> getVolume() {
         return this;
+    }
+
+    public boolean isTicking(Level level) {
+        if(!boundsInitialized) return false;
+        Vec3 center = boundsCache.getCenter();
+        ChunkPos chunkPos = new ChunkPos(BlockPos.containing(center));
+        return VSGameUtilsKt.isTickingChunk(level, chunkPos);
     }
 
     public LongOpenHashSet getVolumeForSerialization() {
@@ -334,9 +345,9 @@ public class Balloon implements Iterable<BlockPos> {
         countAtZ.put(z, prevZ + 1);
 
         if (!boundsInitialized) {
-            minX = maxX = x;
-            minY = maxY = y;
-            minZ = maxZ = z;
+            minX = (maxX = x);
+            minY = (maxY = y);
+            minZ = (maxZ = z);
             boundsInitialized = true;
             updateBoundsCache();
             return;

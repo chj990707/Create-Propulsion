@@ -2,13 +2,12 @@ package com.deltasf.createpropulsion.compat.computercraft;
 
 import com.deltasf.createpropulsion.thruster.AbstractThrusterBlockEntity;
 import com.deltasf.createpropulsion.thruster.creative_thruster.CreativeThrusterBlockEntity;
-import com.simibubi.create.compat.computercraft.implementation.peripherals.SyncedPeripheral;
 import dan200.computercraft.api.lua.LuaFunction;
 import dan200.computercraft.api.peripheral.IComputerAccess;
 import dan200.computercraft.api.peripheral.IPeripheral;
 import org.jetbrains.annotations.NotNull;
 
-public class CreativeThrusterPeripheral extends SyncedPeripheral<CreativeThrusterBlockEntity> {
+public class CreativeThrusterPeripheral extends AbstractSyncedTargetPeripheral<CreativeThrusterBlockEntity> {
 
     public CreativeThrusterPeripheral(CreativeThrusterBlockEntity blockEntity) {
         super(blockEntity);

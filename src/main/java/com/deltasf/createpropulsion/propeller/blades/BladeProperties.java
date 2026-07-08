@@ -2,12 +2,15 @@ package com.deltasf.createpropulsion.propeller.blades;
 
 import com.deltasf.createpropulsion.registries.PropulsionPartialModels;
 import dev.engine_room.flywheel.lib.model.baked.PartialModel;
+import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 import net.minecraftforge.registries.ForgeRegistries;
 import org.joml.primitives.AABBi;
+
+import java.nio.charset.StandardCharsets;
 
 public class BladeProperties {
     public static final BladeProperties DEFAULT = new BladeProperties();
@@ -60,5 +63,57 @@ public class BladeProperties {
             ? ResourceLocation.fromNamespaceAndPath(parts[0], parts[1]) 
             : ResourceLocation.fromNamespaceAndPath("minecraft", breakDrop);
         return new ItemStack(ForgeRegistries.ITEMS.getValue(rl));
+    }
+
+    public void encode(FriendlyByteBuf buf) {
+        buf.writeInt(maxBlades);
+        buf.writeFloat(gearRatio);
+        buf.writeInt(model.length());
+        buf.writeCharSequence(model, StandardCharsets.UTF_8);
+        buf.writeBoolean(canBeBlurred);
+        buf.writeBoolean(isBladeInverted);
+        buf.writeFloat(fluidEfficiency);
+        buf.writeFloat(airEfficiency);
+        buf.writeFloat(damageModifier);
+        for (int i = 0; i < 6; i++) {
+            buf.writeDouble(damageZone[i]);
+        }
+        for (int i = 0; i < 3; i++) {
+            buf.writeDouble(damageZoneOffset[i]);
+        }
+        buf.writeFloat(torqueFactor);
+        for (int i = 0; i < 6; i++) {
+            buf.writeInt(softObstructionRegion[i]);
+        }
+        buf.writeFloat(stressImpact);
+        buf.writeInt(breakDrop.length());
+        buf.writeCharSequence(breakDrop, StandardCharsets.UTF_8);
+    }
+
+    public static BladeProperties decode(FriendlyByteBuf buf) {
+        BladeProperties properties = new BladeProperties();
+        properties.maxBlades = buf.readInt();
+        properties.gearRatio = buf.readFloat();
+        int modelLength = buf.readInt();
+        properties.model = buf.readCharSequence(modelLength, StandardCharsets.UTF_8).toString();
+        properties.canBeBlurred = buf.readBoolean();
+        properties.isBladeInverted = buf.readBoolean();
+        properties.fluidEfficiency = buf.readFloat();
+        properties.airEfficiency = buf.readFloat();
+        properties.damageModifier = buf.readFloat();
+        for (int i = 0; i < 6; i++) {
+            properties.damageZone[i] = buf.readDouble();
+        }
+        for (int i = 0; i < 3; i++) {
+            properties.damageZoneOffset[i] = buf.readDouble();
+        }
+        properties.torqueFactor = buf.readFloat();
+        for (int i = 0; i < 6; i++) {
+            properties.softObstructionRegion[i] = buf.readInt();
+        }
+        properties.stressImpact = buf.readFloat();
+        int breakDropLength = buf.readInt();
+        properties.breakDrop = buf.readCharSequence(breakDropLength, StandardCharsets.UTF_8).toString();
+        return properties;
     }
 }

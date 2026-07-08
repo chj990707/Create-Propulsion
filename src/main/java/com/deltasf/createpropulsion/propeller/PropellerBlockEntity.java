@@ -6,12 +6,15 @@ import java.util.Optional;
 
 import javax.annotation.Nullable;
 
+import com.mojang.logging.LogUtils;
 import net.createmod.catnip.animation.AnimationTickHolder;
+import net.minecraft.client.Minecraft;
+import net.minecraftforge.api.distmarker.Dist;
+import net.minecraftforge.api.distmarker.OnlyIn;
 import org.jetbrains.annotations.NotNull;
 import org.valkyrienskies.mod.common.util.VectorConversionsMCKt;
 
 import com.deltasf.createpropulsion.PropulsionConfig;
-import com.deltasf.createpropulsion.atmosphere.DimensionAtmosphereManager;
 import com.deltasf.createpropulsion.propeller.blades.PropellerBladeItem;
 import com.deltasf.createpropulsion.propeller.rendering.PropellerRenderer;
 import com.deltasf.createpropulsion.utility.math.MathUtility;
@@ -56,6 +59,8 @@ public class PropellerBlockEntity extends KineticBlockEntity {
     public List<Float> prevBladeAngles;
     public List<Float> renderedBladeAngles;
     public float animationStartTime;
+    protected PropellerSoundInstance soundInstance_low;
+    protected PropellerSoundInstance soundInstance_high;
 
     public float visualRPM = 0f;
     public float visualAngle = 0f;
@@ -81,6 +86,10 @@ public class PropellerBlockEntity extends KineticBlockEntity {
         if (level.isClientSide) {
             if (prevBladeAngles == null) prevBladeAngles = new ArrayList<>();
             if (renderedBladeAngles == null) renderedBladeAngles = new ArrayList<>();
+            soundInstance_low = new PropellerSoundInstance(this, 0);
+            soundInstance_high = new PropellerSoundInstance(this, 1);
+            Minecraft.getInstance().getSoundManager().queueTickingSound(soundInstance_low);
+            Minecraft.getInstance().getSoundManager().queueTickingSound(soundInstance_high);
         } else {
             BlockState state = getBlockState();
 
@@ -88,7 +97,6 @@ public class PropellerBlockEntity extends KineticBlockEntity {
             if (ship != null) {
                 propellerData.setDirection(VectorConversionsMCKt.toJOMLD(state.getValue(PropellerBlock.FACING).getNormal()));
                 propellerData.setThrust(0);
-                propellerData.setAtmosphere(DimensionAtmosphereManager.getData(level));
                 PropellerForceApplier applier = new PropellerForceApplier(propellerData);
                 ship.addApplier(worldPosition, applier);
             }
@@ -132,6 +140,29 @@ public class PropellerBlockEntity extends KineticBlockEntity {
         super.onSpeedChanged(prevSpeed);
         if (getSpeed() != prevSpeed) {
             updateThrust();
+        }
+    }
+
+    @OnlyIn(Dist.CLIENT)
+    @Override
+    public void tickAudio() {
+        super.tickAudio();
+        if (soundInstance_high.isTooHigh()) {
+            int newLow = soundInstance_low.frequencyOrdinal - 1;
+            if (newLow >= 0) {
+                Minecraft.getInstance().getSoundManager().stop(soundInstance_high);
+                soundInstance_high = soundInstance_low;
+                soundInstance_low = new PropellerSoundInstance(this, newLow);
+                Minecraft.getInstance().getSoundManager().queueTickingSound(soundInstance_low);
+            }
+        } else if (soundInstance_low.isTooLow()) {
+            int newHigh = soundInstance_high.frequencyOrdinal + 1;
+            if (newHigh <= PropellerSoundInstance.MAX_FREQ_ORDINAL) {
+                Minecraft.getInstance().getSoundManager().stop(soundInstance_low);
+                soundInstance_low = soundInstance_high;
+                soundInstance_high = new PropellerSoundInstance(this, newHigh);
+                Minecraft.getInstance().getSoundManager().queueTickingSound(soundInstance_high);
+            }
         }
     }
 
@@ -451,5 +482,7 @@ public class PropellerBlockEntity extends KineticBlockEntity {
     public void invalidate() {
         super.invalidate();
         itemHandler.invalidate();
+        if (soundInstance_low != null) Minecraft.getInstance().getSoundManager().stop(soundInstance_low);
+        if (soundInstance_high != null) Minecraft.getInstance().getSoundManager().stop(soundInstance_high);
     }
 }

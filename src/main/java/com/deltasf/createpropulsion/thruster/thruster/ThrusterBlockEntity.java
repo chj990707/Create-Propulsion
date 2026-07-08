@@ -898,7 +898,7 @@ public class ThrusterBlockEntity extends AbstractThrusterBlockEntity
             // oxidizer from a prior disassembleMulti() stays dormant in
             // the private tank until the cell re-forms into a cube, at
             // which point formMulti() harvests it back into the aggregate.
-            if (side == getFluidCapSide()) return tank.getCapability().cast();
+            if (side == getFluidCapSide() || side == null) return tank.getCapability().cast();
         }
         if (PropulsionCompatibility.CC_ACTIVE && computerBehaviour.isPeripheralCap(cap)) {
             return computerBehaviour.getPeripheralCapability().cast();

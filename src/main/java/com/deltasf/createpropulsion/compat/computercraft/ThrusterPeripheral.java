@@ -7,16 +7,17 @@ import dan200.computercraft.api.peripheral.IPeripheral;
 import dan200.computercraft.shared.peripheral.generic.methods.FluidMethods;
 import net.minecraftforge.fluids.capability.IFluidHandler;
 
+import java.util.HashSet;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 import org.jetbrains.annotations.NotNull;
 
 import com.deltasf.createpropulsion.thruster.AbstractThrusterBlockEntity;
 import com.deltasf.createpropulsion.thruster.thruster.ThrusterBlockEntity;
-import com.simibubi.create.compat.computercraft.implementation.peripherals.SyncedPeripheral;
 
-public class ThrusterPeripheral extends SyncedPeripheral<ThrusterBlockEntity> {
+public class ThrusterPeripheral extends AbstractSyncedTargetPeripheral<ThrusterBlockEntity> {
     private final FluidMethods fluidMethods = new FluidMethods();
 
     public ThrusterPeripheral(ThrusterBlockEntity blockEntity) {
@@ -26,6 +27,13 @@ public class ThrusterPeripheral extends SyncedPeripheral<ThrusterBlockEntity> {
     @Override
     public final String getType() {
         return "propulsion_thruster";
+    }
+
+    @Override
+    public Set<String> getAdditionalTypes() {
+        Set<String> result = new HashSet<>(super.getAdditionalTypes());
+        result.add("fluid_storage");
+        return result;
     }
 
     @LuaFunction

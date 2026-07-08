@@ -3,13 +3,13 @@ package com.deltasf.createpropulsion.balloons.injectors.hot_air_pump;
 import java.util.List;
 import java.util.UUID;
 
+import com.deltasf.createpropulsion.balloons.hot_air.HotAirSolver;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.valkyrienskies.core.api.ships.Ship;
 import org.valkyrienskies.mod.common.VSGameUtilsKt;
 
 import com.deltasf.createpropulsion.PropulsionConfig;
-import com.deltasf.createpropulsion.atmosphere.DimensionAtmosphereManager;
 import com.deltasf.createpropulsion.balloons.Balloon;
 import com.deltasf.createpropulsion.balloons.injectors.AirInjectorObstructionBehaviour;
 import com.deltasf.createpropulsion.balloons.injectors.BalloonInfoBehaviour;
@@ -214,7 +214,6 @@ public class HotAirPumpBlockEntity extends KineticBlockEntity implements IHotAir
 
     @Override
     public boolean addToGoggleTooltip(List<Component> tooltip, boolean isPlayerSneaking) {
-        boolean isAirless = level != null && DimensionAtmosphereManager.getData(level).isAirless();
         boolean isBalloonPresent = balloonInfoBehaviour.isBalloonPresent();
         boolean hasRPM = Math.abs(getSpeed()) > 0;
         boolean hasHeat = lastHeatConsumed >= OPERATING_THRESHOLD;
@@ -224,10 +223,11 @@ public class HotAirPumpBlockEntity extends KineticBlockEntity implements IHotAir
         String key = "";
         ChatFormatting color = null;
 
-        if (isAirless) {
-            key = "createpropulsion.gui.goggles.hot_air_pump.status.airless"; 
-            color = ChatFormatting.RED;
-        } else if (!isOnShip) {
+//        if (isAirless) {
+//            key = "createpropulsion.gui.goggles.hot_air_pump.status.airless";
+//            color = ChatFormatting.RED;
+//        }
+        if (!isOnShip) {
             key = "createpropulsion.gui.goggles.hot_air_burner.status.not_shipified";
             color = ChatFormatting.RED;
         } else if (!isBalloonPresent) {
@@ -263,7 +263,8 @@ public class HotAirPumpBlockEntity extends KineticBlockEntity implements IHotAir
             .forGoggles(tooltip);
 
         //Injection
-        if (!isAirless && isOnShip && isBalloonPresent) {
+//        if (!isAirless && isOnShip && isBalloonPresent) {
+        if (isOnShip && isBalloonPresent) {
             double currentInjection = getInjectionAmount();
             double baseInjection = PropulsionConfig.HOT_AIR_PUMP_BASE_INJECTION_AMOUNT.get();
             int percentage = (int) ((currentInjection / baseInjection) * 100);
@@ -281,7 +282,8 @@ public class HotAirPumpBlockEntity extends KineticBlockEntity implements IHotAir
         }
 
         //Balloon
-        if (!isAirless && isBalloonPresent) {
+//        if (!isAirless && isBalloonPresent) {
+        if (isBalloonPresent) {
             CreateLang.text("").forGoggles(tooltip);
             balloonInfoBehaviour.addBalloonTooltip(tooltip, isPlayerSneaking);
         }

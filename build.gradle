@@ -65,6 +65,16 @@ repositories {
     mavenCentral()
 
     maven {
+        name "forgeMaven"
+        url "https://maven.minecraftforge.net"
+    }
+
+    maven {
+        name = 'Kotlin for Forge'
+        url = 'https://thedarkcolour.github.io/KotlinForForge/'
+    }
+
+    maven {
         url = "https://modmaven.dev/"
     }
 

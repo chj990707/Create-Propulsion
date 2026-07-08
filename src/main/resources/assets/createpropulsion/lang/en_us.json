@@ -300,6 +300,7 @@
   "createpropulsion.ponder.shared.multiblock_efficiency.power_1": "§fA §32x2x2 §fthruster has the power of 8 singular thrusters",
   "createpropulsion.ponder.shared.multiblock_efficiency.power_2": "§f...and a §33x3x3 §fthruster has the power of 27.",
   "createpropulsion.ponder.shared.multiblock_efficiency.efficiency_1": "§fA §32x2x2 §fthruster is slightly more fuel-efficient than 8 singular thrusters.",
-  "createpropulsion.ponder.shared.multiblock_efficiency.efficiency_2": "§fA §33x3x3 §fthruster is is even more fuel-efficient, and also gains oxidizer efficiency."
+  "createpropulsion.ponder.shared.multiblock_efficiency.efficiency_2": "§fA §33x3x3 §fthruster is is even more fuel-efficient, and also gains oxidizer efficiency.",
 
+  "sounds.createpropulsion.prop_loop": "Propeller spinning"
 }

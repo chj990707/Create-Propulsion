@@ -2,17 +2,19 @@ package com.deltasf.createpropulsion.propeller;
 
 import com.fasterxml.jackson.annotation.JsonAutoDetect;
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import kotlin.Triple;
 import org.joml.Vector3d;
 import org.joml.Vector3dc;
 import org.valkyrienskies.core.api.ships.properties.ShipTransform;
+import org.valkyrienskies.core.api.util.AerodynamicUtils;
+import org.valkyrienskies.core.api.world.PhysLevel;
+import org.valkyrienskies.core.api.world.ServerShipWorld;
 import org.valkyrienskies.core.impl.game.ships.PhysShipImpl;
 import org.valkyrienskies.mod.common.VSGameUtilsKt;
 import org.valkyrienskies.mod.common.ValkyrienSkiesMod;
 import org.valkyrienskies.mod.common.util.VectorConversionsMCKt;
 
 import com.deltasf.createpropulsion.PropulsionConfig;
-import com.deltasf.createpropulsion.atmosphere.AtmoshpereHelper;
-import com.deltasf.createpropulsion.atmosphere.AtmosphereData;
 
 import net.minecraft.core.BlockPos;
 
@@ -43,16 +45,15 @@ public class PropellerForceApplier {
     //Jackson constructor
     public PropellerForceApplier() {}
 
-    public void applyForces(BlockPos pos, PhysShipImpl ship) {
+    public void applyForces(BlockPos pos, PhysShipImpl ship, PhysLevel level) {
         float thrust = data.getThrust();
         float torque = data.getTorque(); 
         if (thrust == 0 && torque == 0) return;
-        AtmosphereData atmosphere = data.getAtmosphere();
-        if (atmosphere == null) return;
+        AerodynamicUtils aerodynamicUtils = level.getAerodynamicUtils();
 
         final double maxSpeed = PropulsionConfig.PROPELLER_MAX_SPEED.get();
         final double forceMultiplier = PropulsionConfig.PROPELLER_POWER_MULTIPLIER.get();
-        thrust *= forceMultiplier;
+        thrust *= (float) forceMultiplier;
         //Direction from ship space to world space
         final ShipTransform transform = ship.getTransform();
         final Vector3dc shipCenterOfMass = transform.getPositionInShip(); 
@@ -63,7 +64,7 @@ public class PropellerForceApplier {
         //Positioning and density
         transform.getShipToWorld().transformDirection(data.getDirection(), worldForceDirection);
         Vector3d worldPos = transform.getShipToWorld().transformPosition(VectorConversionsMCKt.toJOMLD(pos));
-        double externalAirDensity = AtmoshpereHelper.calculateExternalAirDensity(atmosphere, worldPos.y, true);
+        double externalAirDensity = aerodynamicUtils.getAirDensityForY(worldPos.y, level.getDimension());
         //Torque calculation and application
         if (torque != 0) {
             Vector3d torqueVector = new Vector3d(worldForceDirection).normalize().mul(torque);

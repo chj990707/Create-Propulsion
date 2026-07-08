@@ -4,14 +4,14 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 
+import com.deltasf.createpropulsion.propeller.blades.BladeDataManager;
+import com.deltasf.createpropulsion.propeller.blades.SyncBladePropertiesPacket;
 import org.valkyrienskies.core.api.ships.LoadedServerShip;
 import org.valkyrienskies.core.api.ships.ServerShip;
 import org.valkyrienskies.core.api.ships.Ship;
 import org.valkyrienskies.mod.common.VSGameUtilsKt;
 
 import com.deltasf.createpropulsion.CreatePropulsion;
-import com.deltasf.createpropulsion.atmosphere.DimensionAtmosphereManager;
-import com.deltasf.createpropulsion.balloons.hot_air.BalloonAttachment;
 import com.deltasf.createpropulsion.balloons.registries.BalloonShipRegistry;
 import com.deltasf.createpropulsion.balloons.serialization.BalloonSerializer;
 import com.deltasf.createpropulsion.magnet.MagnetForceAttachment;
@@ -50,7 +50,6 @@ public class ForgeEvents {
     @SubscribeEvent
     public static void onAddReloadListeners(AddReloadListenerEvent event) {
         event.addListener(new ThrusterFuelManager());
-        event.addListener(new DimensionAtmosphereManager());
         event.addListener(new AssemblyBlacklistManager());
     }
 
@@ -59,6 +58,7 @@ public class ForgeEvents {
     public static void onPlayerLogin(PlayerEvent.PlayerLoggedInEvent event) {
         if(event.getEntity() instanceof ServerPlayer player)  {
             PropulsionPackets.sendToPlayer(SyncThrusterFuelsPacket.create(ThrusterFuelManager.getFuelPropertiesMap()), player);
+            PropulsionPackets.sendToPlayer(SyncBladePropertiesPacket.create(BladeDataManager.getBladeMap()), player);
         }
     }
 
@@ -99,11 +99,6 @@ public class ForgeEvents {
                     var magnetAttachment  = serverShip.getAttachment(MagnetForceAttachment.class);
                     if (magnetAttachment != null) {
                         magnetAttachment.dimension = level.dimension();
-                    }
-                    //Restore BalloonAttachment atmosphere data
-                    var balloonAttachment = serverShip.getAttachment(BalloonAttachment.class);
-                    if (balloonAttachment != null) {
-                        BalloonAttachment.updateAtmosphereData(balloonAttachment, level.dimension().location().toString());
                     }
                 }
             }

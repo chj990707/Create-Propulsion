@@ -15,14 +15,12 @@ import org.joml.Vector3d;
 import org.joml.Vector3dc;
 import org.valkyrienskies.core.api.ships.PhysShip;
 import org.valkyrienskies.core.api.ships.ShipPhysicsListener;
+import org.valkyrienskies.core.api.util.AerodynamicUtils;
 import org.valkyrienskies.core.api.world.PhysLevel;
 import org.valkyrienskies.core.impl.game.ships.PhysShipImpl;
 import org.valkyrienskies.mod.common.ValkyrienSkiesMod;
 
 import com.deltasf.createpropulsion.PropulsionConfig;
-import com.deltasf.createpropulsion.atmosphere.AtmoshpereHelper;
-import com.deltasf.createpropulsion.atmosphere.AtmosphereData;
-import com.deltasf.createpropulsion.atmosphere.DimensionAtmosphereManager;
 import com.deltasf.createpropulsion.balloons.Balloon;
 import com.deltasf.createpropulsion.balloons.BalloonForceChunk;
 import com.deltasf.createpropulsion.balloons.Balloon.ChunkKey;
@@ -39,25 +37,10 @@ import net.minecraft.world.level.Level;
 @JsonAutoDetect(fieldVisibility = JsonAutoDetect.Visibility.ANY)
 public final class BalloonAttachment implements ShipPhysicsListener {
     public BalloonAttachment() {}
-    private AtmosphereData atmosphereData;
-    private transient boolean isAtmosphereLoaded = false;
     final static double epsilon = MathUtility.epsilon;
 
     @Override
     public void physTick(@NotNull PhysShip physicShip, @NotNull PhysLevel physLevel) {
-        if (!isAtmosphereLoaded) {
-            String dimension = physLevel.getDimension();
-            if (dimension != null) {
-                AtmosphereData data = DimensionAtmosphereManager.getData(dimension);
-                atmosphereData = data;
-                if (!data.isFallback()) {
-                    isAtmosphereLoaded = true;
-                }
-            }
-            
-        }
-        if (atmosphereData == null) { return; }
-
         List<Balloon> balloons = BalloonShipRegistry.forShip(physicShip.getId()).getBalloons(); 
         Matrix4dc shipToWorld = physicShip.getTransform().getShipToWorld();
 
@@ -65,12 +48,11 @@ public final class BalloonAttachment implements ShipPhysicsListener {
         accumulatedTorque.zero();
 
         var currentServer = ValkyrienSkiesMod.getCurrentServer();
-        long gameTime = currentServer.getTickCount();
 
         for(Balloon balloon : balloons) {
             double fullness = balloon.hotAir / balloon.getVolumeSize();
             if (fullness <= epsilon) continue;
-            calculateForcesForBalloon(shipToWorld, physicShip, balloon, fullness, gameTime);
+            calculateForcesForBalloon(shipToWorld, physicShip, balloon, fullness, physLevel);
         }
 
         //Angular dampening
@@ -94,7 +76,7 @@ public final class BalloonAttachment implements ShipPhysicsListener {
         PhysShipImpl simpl = (PhysShipImpl)physicShip;
         Vector3dc angVel = simpl.getAngularVelocity();
 
-        if (angVel != null && angVel.lengthSquared() > 1e-9) {
+        if (angVel.lengthSquared() > 1e-9) {
             Matrix4dc worldToShip = physicShip.getTransform().getWorldToShip();
             Vector3d angVelShipSpace = new Vector3d();
             worldToShip.transformDirection(angVel, angVelShipSpace);
@@ -145,8 +127,9 @@ public final class BalloonAttachment implements ShipPhysicsListener {
         }
     }
 
-    private void calculateForcesForBalloon(Matrix4dc shipToWorld, PhysShip physicShip, Balloon balloon, double fullness, long gameTime) {
+    private void calculateForcesForBalloon(Matrix4dc shipToWorld, PhysShip physicShip, Balloon balloon, double fullness, PhysLevel level) {
         ConcurrentHashMap<ChunkKey, BalloonForceChunk> chunks = balloon.getChunkMap();
+        AerodynamicUtils aerodynamicUtils = level.getAerodynamicUtils();
 
         Vector3dc shipCOMInShipSpace = physicShip.getTransform().getPositionInShip();
         shipToWorld.transformPosition(shipCOMInShipSpace.x(), shipCOMInShipSpace.y(), shipCOMInShipSpace.z(), shipCOMWorld);
@@ -168,8 +151,8 @@ public final class BalloonAttachment implements ShipPhysicsListener {
             shipToWorld.transformPosition(appShipX, appShipY, appShipZ, tmpWorldPos);
 
             //Calculate force magnitude
-            double externalDensity = AtmoshpereHelper.calculateVariableExternalAirDensity(atmosphereData, tmpWorldPos.x, tmpWorldPos.y, tmpWorldPos.z, gameTime,true);
-            double forceMagnitude = chunk.blockCount * externalDensity * atmosphereData.gravity() * fullness;
+            double externalDensity = aerodynamicUtils.getAirDensityForY(tmpWorldPos.y, level.getDimension());
+            double forceMagnitude = chunk.blockCount * externalDensity * aerodynamicUtils.getAtmosphereForDimension(level.getDimension()).component3() * fullness;
             forceMagnitude = Math.max(0, forceMagnitude * PropulsionConfig.BALLOON_FORCE_COEFFICIENT.get());
             //Calculate force vector
             tmpForce.set(upWorld).mul(forceMagnitude);
@@ -197,24 +180,10 @@ public final class BalloonAttachment implements ShipPhysicsListener {
 
     //Attachment bloat
     public static BalloonAttachment get(Level level, BlockPos pos) {
-        return AttachmentUtils.get(level, pos, BalloonAttachment.class, () -> {
-            BalloonAttachment attachment = new BalloonAttachment();
-            
-            updateAtmosphereData(attachment, level.dimension().location().toString());
-
-            return attachment;
-        });
+        return AttachmentUtils.get(level, pos, BalloonAttachment.class, BalloonAttachment::new);
     }
 
     public static void ensureAttachmentExists(@Nonnull Level level, @Nonnull BlockPos pos) {
         get(level, pos);
-    }
-
-    public static void updateAtmosphereData(BalloonAttachment attachment, String dimensionId) {
-        AtmosphereData data = DimensionAtmosphereManager.getData(dimensionId);
-        attachment.atmosphereData = data;
-        if (!data.isFallback()) {
-            attachment.isAtmosphereLoaded = true;
-        }
     }
 }
