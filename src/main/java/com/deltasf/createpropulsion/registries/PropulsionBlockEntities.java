@@ -12,6 +12,8 @@ import com.deltasf.createpropulsion.heat.burners.solid.SolidBurnerBlockEntity;
 import com.deltasf.createpropulsion.heat.engine.StirlingEngineBlockEntity;
 import com.deltasf.createpropulsion.heat.engine.StirlingEngineRenderer;
 import com.deltasf.createpropulsion.heat.engine.StirlingEngineVisual;
+import com.deltasf.createpropulsion.helm.RedstoneHelmBlockEntity;
+import com.deltasf.createpropulsion.helm.RedstoneHelmRenderer;
 import com.deltasf.createpropulsion.lodestone_tracker.LodestoneTrackerBlockEntity;
 import com.deltasf.createpropulsion.lodestone_tracker.LodestoneTrackerRenderer;
 import com.deltasf.createpropulsion.magnet.RedstoneMagnetBlockEntity;
@@ -163,4 +165,10 @@ public class PropulsionBlockEntities {
         REGISTRATE.blockEntity("impact_sensor_block_entity", ImpactSensorBlockEntity::new)
         .validBlock(PropulsionBlocks.IMPACT_SENSOR_BLOCK)
         .register();*/
+
+    public static final BlockEntityEntry<RedstoneHelmBlockEntity> REDSTONE_HELM_BLOCK_ENTITY =
+            REGISTRATE.blockEntity("redstone_helm_block_entity", RedstoneHelmBlockEntity::new)
+                    .validBlock(PropulsionBlocks.REDSTONE_HELM_BLOCK)
+                    .renderer(() -> RedstoneHelmRenderer::new)
+                    .register();
 }

@@ -75,6 +75,7 @@ public class PropulsionCreativeTab {
             output.accept(PropulsionItems.ANDESITE_BLADE);
 
             output.accept(PropulsionBlocks.TILT_ADAPTER_BLOCK);
+            output.accept(PropulsionBlocks.REDSTONE_HELM_BLOCK);
         }
     }
 }

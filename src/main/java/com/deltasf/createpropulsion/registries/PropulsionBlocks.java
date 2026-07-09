@@ -6,6 +6,7 @@ import com.deltasf.createpropulsion.balloons.envelopes.EnvelopedShaftBlock;
 import com.deltasf.createpropulsion.balloons.injectors.hot_air_burner.HotAirBurnerBlock;
 import com.deltasf.createpropulsion.balloons.injectors.hot_air_pump.HotAirPumpBlock;
 import com.deltasf.createpropulsion.heat.burners.liquid.LiquidBurnerBlock;
+import com.deltasf.createpropulsion.helm.RedstoneHelmBlock;
 import com.deltasf.createpropulsion.heat.burners.solid.SolidBurnerBlock;
 import com.deltasf.createpropulsion.heat.engine.StirlingEngineBlock;
 import com.deltasf.createpropulsion.lodestone_tracker.LodestoneTrackerBlock;
@@ -49,6 +50,7 @@ import net.minecraft.world.item.Item;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.ItemLike;
 import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.SoundType;
 import net.minecraft.world.level.material.MapColor;
 import net.minecraft.world.level.storage.loot.LootPool;
@@ -475,4 +477,14 @@ public class PropulsionBlocks {
     public static BlockEntry<EnvelopedShaftBlock> getEnvelopedShaft(EnvelopeColor color) {
         return ENVELOPED_SHAFT_BLOCKS.get(color);
     }
+
+    //Redstone helm (ported from Valkyrien Sails, MIT)
+    public static final BlockEntry<RedstoneHelmBlock> REDSTONE_HELM_BLOCK = REGISTRATE.block("redstone_helm", RedstoneHelmBlock::new)
+            .initialProperties(() -> Blocks.SPRUCE_PLANKS)
+            .properties(p -> p.noOcclusion())
+            .tag(BlockTags.MINEABLE_WITH_AXE)
+            .blockstate(FUCK_OFF())
+            .item().model(FUCK_OFF_ITEM()).build()
+            .setData(ProviderType.LANG, FUCK_OFF_LANG())
+            .register();
 }

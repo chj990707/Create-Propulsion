@@ -42,6 +42,8 @@ public class PropulsionPartialModels {
     //Transmission
     public static final PartialModel TRANSMISSION_PLUS = partial("transmission_plus");
     public static final PartialModel TRANSMISSION_MINUS = partial("transmission_minus");
+    //Redstone helm
+    public static final PartialModel REDSTONE_HELM_WHEEL = partial("redstone_helm_wheel");
     //Hot air pump
     public static final PartialModel HOT_AIR_PUMP_COG = partial("hot_air_pump_cogwheel");
     public static final PartialModel HOT_AIR_PUMP_MEMBRANE = partial("hot_air_pump_membrane");

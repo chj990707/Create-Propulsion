@@ -1,0 +1,1894 @@
+diff --git a/src/generated/resources/data/createpropulsion/loot_tables/blocks/redstone_helm.json b/src/generated/resources/data/createpropulsion/loot_tables/blocks/redstone_helm.json
+new file mode 100644
+index 0000000..68fb7ad
+--- /dev/null
++++ b/src/generated/resources/data/createpropulsion/loot_tables/blocks/redstone_helm.json
+@@ -0,0 +1,21 @@
++{
++  "type": "minecraft:block",
++  "pools": [
++    {
++      "bonus_rolls": 0.0,
++      "conditions": [
++        {
++          "condition": "minecraft:survives_explosion"
++        }
++      ],
++      "entries": [
++        {
++          "type": "minecraft:item",
++          "name": "createpropulsion:redstone_helm"
++        }
++      ],
++      "rolls": 1.0
++    }
++  ],
++  "random_sequence": "createpropulsion:blocks/redstone_helm"
++}
+\ No newline at end of file
+diff --git a/src/generated/resources/data/minecraft/tags/blocks/mineable/axe.json b/src/generated/resources/data/minecraft/tags/blocks/mineable/axe.json
+index 16f6a9e..b27c4fc 100644
+--- a/src/generated/resources/data/minecraft/tags/blocks/mineable/axe.json
++++ b/src/generated/resources/data/minecraft/tags/blocks/mineable/axe.json
+@@ -6,6 +6,7 @@
+     "createpropulsion:tilt_adapter",
+     "createpropulsion:copycat_wing",
+     "createpropulsion:copycat_wing_8",
+-    "createpropulsion:copycat_wing_12"
++    "createpropulsion:copycat_wing_12",
++    "createpropulsion:redstone_helm"
+   ]
+ }
+\ No newline at end of file
+diff --git a/src/main/java/com/deltasf/createpropulsion/PropulsionConfig.java b/src/main/java/com/deltasf/createpropulsion/PropulsionConfig.java
+index 7a3cff1..d2a471a 100644
+--- a/src/main/java/com/deltasf/createpropulsion/PropulsionConfig.java
++++ b/src/main/java/com/deltasf/createpropulsion/PropulsionConfig.java
+@@ -108,6 +108,10 @@ public class PropulsionConfig {
+     //Tilt adapter
+     public static final ForgeConfigSpec.ConfigValue<Double> TILT_ADAPTER_ANGLE_RANGE;
+ 
++    //Helm
++    public static final ForgeConfigSpec.ConfigValue<Integer> HELM_WHEEL_INTERVAL;
++    public static final ForgeConfigSpec.ConfigValue<Integer> HELM_SPRINT_STEPS;
++
+     //Atmosphere
+     public static final ForgeConfigSpec.ConfigValue<Double> ATMOSPHERE_HEIGHT_FACTOR;
+     public static final ForgeConfigSpec.ConfigValue<Double> ATMOSPHERE_NOISE_MAGNITUDE;
+@@ -247,6 +251,13 @@ public class PropulsionConfig {
+                 .defineInRange("Angle range", 30.0, 10.0, 60.0);
+         SERVER_BUILDER.pop();
+ 
++        SERVER_BUILDER.push("Helm");
++        HELM_WHEEL_INTERVAL = SERVER_BUILDER.comment("Degrees the ship's wheel turns per input step. Lower values give finer signal control (one redstone level per 24 degrees).")
++                .defineInRange("Wheel interval", 6, 1, 90);
++        HELM_SPRINT_STEPS = SERVER_BUILDER.comment("How many wheel steps are performed per tick while the helmsman holds the sprint key.")
++                .defineInRange("Sprint speed multiplier", 3, 1, 10);
++        SERVER_BUILDER.pop();
++
+         SERVER_BUILDER.push("Atmosphere");
+         ATMOSPHERE_HEIGHT_FACTOR = SERVER_BUILDER.comment("Height factor of the atmosphere. Increase this value if balloons are flying too low.")
+                 .define("Height factor", 1.0);
+diff --git a/src/main/java/com/deltasf/createpropulsion/helm/HelmClientHandler.java b/src/main/java/com/deltasf/createpropulsion/helm/HelmClientHandler.java
+new file mode 100644
+index 0000000..269f0ae
+--- /dev/null
++++ b/src/main/java/com/deltasf/createpropulsion/helm/HelmClientHandler.java
+@@ -0,0 +1,18 @@
++package com.deltasf.createpropulsion.helm;
++
++import net.minecraft.client.Minecraft;
++import net.minecraft.client.multiplayer.ClientLevel;
++import net.minecraft.core.BlockPos;
++import net.minecraft.world.level.block.entity.BlockEntity;
++
++/** Client-only logic, kept in its own class so the server never loads client classes. */
++public class HelmClientHandler {
++    public static void handleWheelAngle(BlockPos pos, int wheelAngle) {
++        ClientLevel level = Minecraft.getInstance().level;
++        if (level == null) return;
++        BlockEntity be = level.getBlockEntity(pos);
++        if (be instanceof RedstoneHelmBlockEntity helm) {
++            helm.setSyncedWheelAngle(wheelAngle);
++        }
++    }
++}
+diff --git a/src/main/java/com/deltasf/createpropulsion/helm/RedstoneHelmBlock.java b/src/main/java/com/deltasf/createpropulsion/helm/RedstoneHelmBlock.java
+new file mode 100644
+index 0000000..8f48e7b
+--- /dev/null
++++ b/src/main/java/com/deltasf/createpropulsion/helm/RedstoneHelmBlock.java
+@@ -0,0 +1,184 @@
++package com.deltasf.createpropulsion.helm;
++
++import javax.annotation.Nullable;
++
++import org.valkyrienskies.mod.common.VSGameUtilsKt;
++
++import com.deltasf.createpropulsion.registries.PropulsionBlockEntities;
++
++import net.minecraft.core.BlockPos;
++import net.minecraft.core.Direction;
++import net.minecraft.network.chat.Component;
++import net.minecraft.server.level.ServerLevel;
++import net.minecraft.util.Mth;
++import net.minecraft.world.InteractionHand;
++import net.minecraft.world.InteractionResult;
++import net.minecraft.world.entity.player.Player;
++import net.minecraft.world.item.context.BlockPlaceContext;
++import net.minecraft.world.level.BlockGetter;
++import net.minecraft.world.level.Level;
++import net.minecraft.world.level.block.BaseEntityBlock;
++import net.minecraft.world.level.block.Block;
++import net.minecraft.world.level.block.Mirror;
++import net.minecraft.world.level.block.RenderShape;
++import net.minecraft.world.level.block.Rotation;
++import net.minecraft.world.level.block.entity.BlockEntity;
++import net.minecraft.world.level.block.entity.BlockEntityTicker;
++import net.minecraft.world.level.block.entity.BlockEntityType;
++import net.minecraft.world.level.block.state.BlockState;
++import net.minecraft.world.level.block.state.StateDefinition;
++import net.minecraft.world.level.block.state.properties.BlockStateProperties;
++import net.minecraft.world.level.block.state.properties.BooleanProperty;
++import net.minecraft.world.level.block.state.properties.DirectionProperty;
++import net.minecraft.world.phys.BlockHitResult;
++import net.minecraft.world.phys.shapes.CollisionContext;
++import net.minecraft.world.phys.shapes.Shapes;
++import net.minecraft.world.phys.shapes.VoxelShape;
++
++/**
++ * A ship's helm that encodes the wheel angle as redstone signals: turning to
++ * starboard powers the clockwise side, turning to port powers the
++ * counter-clockwise side (0-15, one level per 24 degrees of wheel). Sit on it
++ * while assembled to steer with A/D; hold sprint to turn the wheel faster.
++ *
++ * Ported from Valkyrien Sails' RedstoneHelmBlock
++ * (MIT, https://github.com/Verquinox/valkyrien-sails).
++ */
++public class RedstoneHelmBlock extends BaseEntityBlock {
++    public static final DirectionProperty FACING = BlockStateProperties.HORIZONTAL_FACING;
++    public static final BooleanProperty LEFT = BooleanProperty.create("left");
++    public static final BooleanProperty RIGHT = BooleanProperty.create("right");
++
++    private static final VoxelShape NORTH_SHAPE = Shapes.or(Block.box(5, 0, 2, 11, 16, 11), Block.box(0, 5, 11, 16, 21, 14));
++    private static final VoxelShape SOUTH_SHAPE = Shapes.or(Block.box(5, 0, 5, 11, 16, 14), Block.box(0, 5, 2, 16, 21, 5));
++    private static final VoxelShape EAST_SHAPE = Shapes.or(Block.box(5, 0, 5, 14, 16, 11), Block.box(2, 5, 0, 5, 21, 16));
++    private static final VoxelShape WEST_SHAPE = Shapes.or(Block.box(2, 0, 5, 11, 16, 11), Block.box(11, 5, 0, 14, 21, 16));
++
++    public RedstoneHelmBlock(Properties properties) {
++        super(properties);
++        registerDefaultState(stateDefinition.any()
++                .setValue(FACING, Direction.NORTH)
++                .setValue(LEFT, false)
++                .setValue(RIGHT, false));
++    }
++
++    @Override
++    @SuppressWarnings("deprecation")
++    public VoxelShape getShape(BlockState state, BlockGetter level, BlockPos pos, CollisionContext context) {
++        switch (state.getValue(FACING)) {
++            case SOUTH: return SOUTH_SHAPE;
++            case EAST: return EAST_SHAPE;
++            case WEST: return WEST_SHAPE;
++            case NORTH:
++            default: return NORTH_SHAPE;
++        }
++    }
++
++    @Override
++    public RenderShape getRenderShape(BlockState state) {
++        return RenderShape.MODEL;
++    }
++
++    @Override
++    public BlockState getStateForPlacement(BlockPlaceContext context) {
++        return defaultBlockState().setValue(FACING, context.getHorizontalDirection());
++    }
++
++    @Override
++    @SuppressWarnings("deprecation")
++    public BlockState rotate(BlockState state, Rotation rotation) {
++        return state.setValue(FACING, rotation.rotate(state.getValue(FACING)));
++    }
++
++    @Override
++    @SuppressWarnings("deprecation")
++    public BlockState mirror(BlockState state, Mirror mirror) {
++        return state.rotate(mirror.getRotation(state.getValue(FACING)));
++    }
++
++    @Override
++    @SuppressWarnings("deprecation")
++    public InteractionResult use(BlockState state, Level level, BlockPos pos, Player player, InteractionHand hand, BlockHitResult hit) {
++        if (level.isClientSide) {
++            return InteractionResult.SUCCESS;
++        }
++        if (!(level.getBlockEntity(pos) instanceof RedstoneHelmBlockEntity helm)) {
++            return InteractionResult.sidedSuccess(false);
++        }
++
++        if (VSGameUtilsKt.isBlockInShipyard(level, pos)) {
++            helm.sit(player);
++        } else {
++            //Off-ship helms can still be turned by hand: click for starboard, shift-click for port
++            if (player.isShiftKeyDown()) {
++                helm.rotateWheelLeft((ServerLevel) level, pos);
++            } else {
++                helm.rotateWheelRight((ServerLevel) level, pos);
++            }
++            updateNeighbours(state, level, pos);
++            player.displayClientMessage(Component.literal("Angle: " + (helm.getWheelAngle() - RedstoneHelmBlockEntity.CENTER_ANGLE) + "\u00b0"), true);
++        }
++        return InteractionResult.sidedSuccess(false);
++    }
++
++    //=== Redstone ===
++
++    @Override
++    @SuppressWarnings("deprecation")
++    public boolean isSignalSource(BlockState state) {
++        return true;
++    }
++
++    @Override
++    @SuppressWarnings("deprecation")
++    public int getSignal(BlockState state, BlockGetter level, BlockPos pos, Direction direction) {
++        if (level.getBlockEntity(pos) instanceof RedstoneHelmBlockEntity helm) {
++            int wheelAngle = helm.getWheelAngle();
++            if (direction == state.getValue(FACING).getClockWise()) {
++                return Mth.clamp((wheelAngle - RedstoneHelmBlockEntity.CENTER_ANGLE) / 24, 0, 15);
++            } else if (direction == state.getValue(FACING).getCounterClockWise()) {
++                return Mth.clamp((RedstoneHelmBlockEntity.CENTER_ANGLE - wheelAngle) / 24, 0, 15);
++            }
++        }
++        return 0;
++    }
++
++    public void updateNeighbours(BlockState state, Level level, BlockPos pos) {
++        level.updateNeighborsAt(pos, this);
++        level.updateNeighborsAt(pos.relative(state.getValue(FACING).getClockWise()), this);
++        level.updateNeighborsAt(pos.relative(state.getValue(FACING).getCounterClockWise()), this);
++    }
++
++    @Override
++    @SuppressWarnings("deprecation")
++    public void onRemove(BlockState state, Level level, BlockPos pos, BlockState newState, boolean moved) {
++        if (!moved && !state.is(newState.getBlock())) {
++            updateNeighbours(state, level, pos);
++        }
++        if (state.hasBlockEntity() && !state.is(newState.getBlock())) {
++            level.removeBlockEntity(pos);
++        }
++    }
++
++    //=== Block entity ===
++
++    @Nullable
++    @Override
++    public BlockEntity newBlockEntity(BlockPos pos, BlockState state) {
++        return PropulsionBlockEntities.REDSTONE_HELM_BLOCK_ENTITY.create(pos, state);
++    }
++
++    @Nullable
++    @Override
++    public <T extends BlockEntity> BlockEntityTicker<T> getTicker(Level level, BlockState state, BlockEntityType<T> type) {
++        if (level.isClientSide) {
++            return createTickerHelper(type, PropulsionBlockEntities.REDSTONE_HELM_BLOCK_ENTITY.get(), RedstoneHelmBlockEntity::clientTick);
++        }
++        return createTickerHelper(type, PropulsionBlockEntities.REDSTONE_HELM_BLOCK_ENTITY.get(), RedstoneHelmBlockEntity::serverTick);
++    }
++
++    @Override
++    protected void createBlockStateDefinition(StateDefinition.Builder<Block, BlockState> builder) {
++        builder.add(FACING, LEFT, RIGHT);
++    }
++}
+diff --git a/src/main/java/com/deltasf/createpropulsion/helm/RedstoneHelmBlockEntity.java b/src/main/java/com/deltasf/createpropulsion/helm/RedstoneHelmBlockEntity.java
+new file mode 100644
+index 0000000..0accabb
+--- /dev/null
++++ b/src/main/java/com/deltasf/createpropulsion/helm/RedstoneHelmBlockEntity.java
+@@ -0,0 +1,247 @@
++package com.deltasf.createpropulsion.helm;
++
++import java.util.ArrayList;
++import java.util.List;
++
++import org.joml.Vector3d;
++import org.joml.Vector3dc;
++import org.valkyrienskies.core.api.ships.LoadedServerShip;
++import org.valkyrienskies.core.api.ships.ServerShip;
++import org.valkyrienskies.mod.api.SeatedControllingPlayer;
++import org.valkyrienskies.mod.common.VSGameUtilsKt;
++import org.valkyrienskies.mod.common.ValkyrienSkiesMod;
++import org.valkyrienskies.mod.common.entity.ShipMountingEntity;
++
++import com.deltasf.createpropulsion.PropulsionConfig;
++import com.deltasf.createpropulsion.network.PropulsionPackets;
++import com.deltasf.createpropulsion.utility.AttachmentUtils;
++
++import net.minecraft.commands.arguments.EntityAnchorArgument;
++import net.minecraft.core.BlockPos;
++import net.minecraft.core.Direction;
++import net.minecraft.nbt.CompoundTag;
++import net.minecraft.server.level.ServerLevel;
++import net.minecraft.sounds.SoundEvents;
++import net.minecraft.sounds.SoundSource;
++import net.minecraft.util.Mth;
++import net.minecraft.world.entity.MoverType;
++import net.minecraft.world.entity.player.Player;
++import net.minecraft.world.level.Level;
++import net.minecraft.world.level.block.entity.BlockEntity;
++import net.minecraft.world.level.block.entity.BlockEntityType;
++import net.minecraft.world.level.block.state.BlockState;
++import net.minecraft.world.phys.Vec3;
++
++/**
++ * Redstone helm block entity: seats the player, tracks the wheel angle
++ * (0..720, centered at 360), and reads the seated player's steering input.
++ * The block converts the angle into redstone signals; no forces are applied.
++ *
++ * Ported from Valkyrien Sails' BaseHelmBlockEntity / RedstoneHelmBlockEntity
++ * (MIT, https://github.com/Verquinox/valkyrien-sails) with two QoL additions:
++ * sprint-to-turn-faster and tick-interpolated wheel animation.
++ */
++public class RedstoneHelmBlockEntity extends BlockEntity {
++    public static final int MAX_ANGLE = 720;
++    public static final int CENTER_ANGLE = 360;
++
++    private final List<ShipMountingEntity> seats = new ArrayList<>();
++    private int wheelAngle = CENTER_ANGLE;
++
++    //Client-side animation state. visualAngle chases wheelAngle at wheel speed each
++    //client tick; the renderer lerps between prevVisualAngle and visualAngle with
++    //partial ticks for a perfectly smooth wheel.
++    public float visualAngle = CENTER_ANGLE;
++    public float prevVisualAngle = CENTER_ANGLE;
++
++    public RedstoneHelmBlockEntity(BlockEntityType<?> type, BlockPos pos, BlockState state) {
++        super(type, pos, state);
++    }
++
++    public static int wheelInterval() {
++        return Math.max(1, PropulsionConfig.HELM_WHEEL_INTERVAL.get());
++    }
++
++    public static int sprintSteps() {
++        return Math.max(1, PropulsionConfig.HELM_SPRINT_STEPS.get());
++    }
++
++    public int getWheelAngle() {
++        return wheelAngle;
++    }
++
++    //=== Ticking ===
++
++    public static void serverTick(Level level, BlockPos pos, BlockState state, RedstoneHelmBlockEntity helm) {
++        if (level.isClientSide) return;
++
++        if (VSGameUtilsKt.isBlockInShipyard(level, pos)) {
++            ServerLevel serverLevel = (ServerLevel) level;
++            ServerShip serverShip = AttachmentUtils.getShipAt(serverLevel, pos);
++            if (serverShip instanceof LoadedServerShip ship) {
++                SeatedControllingPlayer control = ship.getAttachment(SeatedControllingPlayer.class);
++                if (control != null && state.getBlock() instanceof RedstoneHelmBlock redstoneHelm) {
++                    //Holding sprint turns the wheel several steps per tick
++                    int steps = control.getSprintOn() ? sprintSteps() : 1;
++                    boolean rotated = false;
++                    if (control.getLeftImpulse() < 0) {
++                        for (int i = 0; i < steps; i++) rotated |= helm.rotateWheelRight(serverLevel, pos);
++                    } else if (control.getLeftImpulse() > 0) {
++                        for (int i = 0; i < steps; i++) rotated |= helm.rotateWheelLeft(serverLevel, pos);
++                    }
++                    if (rotated) {
++                        redstoneHelm.updateNeighbours(state, level, pos);
++                    }
++                }
++            }
++        }
++
++        //Reflect the wheel position on the LEFT/RIGHT blockstate for the indicator texture
++        if (state.getBlock() instanceof RedstoneHelmBlock) {
++            BlockState newState = state
++                    .setValue(RedstoneHelmBlock.LEFT, helm.wheelAngle > CENTER_ANGLE)
++                    .setValue(RedstoneHelmBlock.RIGHT, helm.wheelAngle < CENTER_ANGLE);
++            if (!newState.equals(state)) {
++                level.setBlock(pos, newState, 3);
++            }
++        }
++    }
++
++    public static void clientTick(Level level, BlockPos pos, BlockState state, RedstoneHelmBlockEntity helm) {
++        helm.prevVisualAngle = helm.visualAngle;
++        float diff = helm.wheelAngle - helm.visualAngle;
++        if (diff == 0) return;
++        //Fastest legitimate wheel speed in degrees per tick
++        float maxStep = wheelInterval() * sprintSteps();
++        float step = Mth.clamp(diff, -maxStep, maxStep);
++        //Catch up quickly after large desyncs instead of slowly grinding over
++        if (Math.abs(diff) > 90.0f) step = diff * 0.5f;
++        helm.visualAngle += step;
++    }
++
++    public void setSyncedWheelAngle(int angle) {
++        this.wheelAngle = angle;
++    }
++
++    //=== Wheel rotation (server side) ===
++
++    public boolean rotateWheelRight(ServerLevel level, BlockPos pos) {
++        boolean success = false;
++        if (wheelAngle - wheelInterval() >= 0) {
++            wheelAngle -= wheelInterval();
++            playWheelSounds(level, pos);
++            setChanged();
++            success = true;
++        }
++        syncAngle(level, pos);
++        return success;
++    }
++
++    public boolean rotateWheelLeft(ServerLevel level, BlockPos pos) {
++        boolean success = false;
++        if (wheelAngle + wheelInterval() <= MAX_ANGLE) {
++            wheelAngle += wheelInterval();
++            playWheelSounds(level, pos);
++            setChanged();
++            success = true;
++        }
++        syncAngle(level, pos);
++        return success;
++    }
++
++    private void syncAngle(ServerLevel level, BlockPos pos) {
++        PropulsionPackets.sendToTracking(new SyncHelmWheelPacket(pos, wheelAngle), level.getChunkAt(pos));
++    }
++
++    private void playWheelSounds(Level level, BlockPos pos) {
++        if ((double) wheelAngle / MAX_ANGLE == 0.5) {
++            level.playSound(null, pos.below(), SoundEvents.BAMBOO_WOOD_BUTTON_CLICK_ON,
++                    SoundSource.BLOCKS, 1.5f, level.getRandom().nextFloat() * 0.1F + 0.9F);
++            level.playSound(null, pos.below(), SoundEvents.ARMOR_EQUIP_CHAIN,
++                    SoundSource.BLOCKS, 0.1f, level.getRandom().nextFloat() * 0.1F + 0.9F);
++        } else if (wheelAngle == MAX_ANGLE || wheelAngle == 0) {
++            level.playSound(null, pos.below(), SoundEvents.BAMBOO_WOOD_BUTTON_CLICK_ON,
++                    SoundSource.BLOCKS, 1.5f, level.getRandom().nextFloat() * 0.1F + 0.9F);
++        }
++    }
++
++    //=== Seat handling ===
++
++    public boolean sit(Player player) {
++        if (!(level instanceof ServerLevel serverLevel)) return false;
++
++        //Clear out previous seats: a new rider takes over the helm
++        for (int i = seats.size() - 1; i >= 0; i--) {
++            if (seats.get(i).isAlive()) {
++                seats.get(i).kill();
++            }
++            seats.remove(i);
++        }
++
++        ShipMountingEntity seat = spawnSeat(getBlockPos(), getBlockState(), serverLevel);
++        boolean ride = player.startRiding(seat, false);
++        if (ride) {
++            seats.add(seat);
++        } else {
++            seat.kill();
++        }
++        return ride;
++    }
++
++    private ShipMountingEntity spawnSeat(BlockPos pos, BlockState state, ServerLevel level) {
++        Direction facing = state.getValue(RedstoneHelmBlock.FACING);
++        Vector3dc mounterPos;
++        if (facing == Direction.NORTH) {
++            mounterPos = new Vector3d(pos.getX() + 0.5, pos.getY() + 0.125, pos.getZ() + 1.3125);
++        } else if (facing == Direction.SOUTH) {
++            mounterPos = new Vector3d(pos.getX() + 0.5, pos.getY() + 0.125, pos.getZ() - 0.3125);
++        } else if (facing == Direction.EAST) {
++            mounterPos = new Vector3d(pos.getX() - 0.3125, pos.getY() + 0.125, pos.getZ() + 0.5);
++        } else {
++            mounterPos = new Vector3d(pos.getX() + 1.3125, pos.getY() + 0.125, pos.getZ() + 0.5);
++        }
++
++        ShipMountingEntity entity = ValkyrienSkiesMod.SHIP_MOUNTING_ENTITY_TYPE.create(level);
++        assert entity != null;
++        entity.setPos(mounterPos.x(), mounterPos.y(), mounterPos.z());
++        entity.lookAt(EntityAnchorArgument.Anchor.EYES, new Vec3(pos.getX(), pos.getY(), pos.getZ()));
++        entity.move(MoverType.SELF, new Vec3(0, 0, 0));
++        entity.setController(true);
++        level.addFreshEntityWithPassengers(entity);
++        return entity;
++    }
++
++    @Override
++    public void setRemoved() {
++        if (level != null && !level.isClientSide) {
++            for (int i = seats.size() - 1; i >= 0; i--) {
++                seats.get(i).kill();
++            }
++            seats.clear();
++        }
++        super.setRemoved();
++    }
++
++    //=== Save / load / sync ===
++
++    @Override
++    protected void saveAdditional(CompoundTag tag) {
++        super.saveAdditional(tag);
++        tag.putInt("wheel_angle", wheelAngle);
++    }
++
++    @Override
++    public void load(CompoundTag tag) {
++        super.load(tag);
++        if (tag.contains("wheel_angle")) {
++            wheelAngle = tag.getInt("wheel_angle");
++        }
++        visualAngle = wheelAngle;
++        prevVisualAngle = wheelAngle;
++    }
++
++    @Override
++    public CompoundTag getUpdateTag() {
++        return saveWithoutMetadata();
++    }
++}
+diff --git a/src/main/java/com/deltasf/createpropulsion/helm/RedstoneHelmRenderer.java b/src/main/java/com/deltasf/createpropulsion/helm/RedstoneHelmRenderer.java
+new file mode 100644
+index 0000000..35fb755
+--- /dev/null
++++ b/src/main/java/com/deltasf/createpropulsion/helm/RedstoneHelmRenderer.java
+@@ -0,0 +1,67 @@
++package com.deltasf.createpropulsion.helm;
++
++import com.deltasf.createpropulsion.registries.PropulsionPartialModels;
++import com.mojang.blaze3d.vertex.PoseStack;
++import com.mojang.blaze3d.vertex.VertexConsumer;
++import com.mojang.math.Axis;
++import com.simibubi.create.foundation.blockEntity.renderer.SafeBlockEntityRenderer;
++
++import net.createmod.catnip.render.CachedBuffers;
++import net.createmod.catnip.render.SuperByteBuffer;
++import net.minecraft.client.renderer.MultiBufferSource;
++import net.minecraft.client.renderer.RenderType;
++import net.minecraft.client.renderer.blockentity.BlockEntityRendererProvider;
++import net.minecraft.core.Direction;
++import net.minecraft.util.Mth;
++import net.minecraft.world.level.block.state.BlockState;
++
++/**
++ * Renders the redstone helm's built-in wheel, interpolating the rotation
++ * between client ticks for a smooth animation.
++ */
++public class RedstoneHelmRenderer extends SafeBlockEntityRenderer<RedstoneHelmBlockEntity> {
++    //Wheel hub in the partial model, in block coordinates (8, 13, 12 in pixels)
++    private static final double PIVOT_X = 0.5;
++    private static final double PIVOT_Y = 0.8125;
++    private static final double PIVOT_Z = 0.75;
++
++    public RedstoneHelmRenderer(BlockEntityRendererProvider.Context context) { super(); }
++
++    @Override
++    protected void renderSafe(RedstoneHelmBlockEntity helm, float partialTicks, PoseStack poseStack,
++                              MultiBufferSource bufferSource, int light, int overlay) {
++        //Interpolate between the last two client ticks for smooth wheel motion
++        float angle = Mth.lerp(partialTicks, helm.prevVisualAngle, helm.visualAngle) % 360.0f;
++        Direction facing = helm.getBlockState().getValue(RedstoneHelmBlock.FACING);
++
++        BlockState state = helm.getBlockState();
++        SuperByteBuffer wheel = CachedBuffers.partial(PropulsionPartialModels.REDSTONE_HELM_WHEEL, state);
++        VertexConsumer buffer = bufferSource.getBuffer(RenderType.cutout());
++
++        poseStack.pushPose();
++
++        //Orient the wheel with the helm. The partial is authored for a north-facing helm.
++        poseStack.translate(0.5, 0.5, 0.5);
++        poseStack.mulPose(Axis.YP.rotationDegrees(horizontalAngle(facing)));
++        poseStack.translate(-0.5, -0.5, -0.5);
++
++        //Spin the wheel around its hub
++        poseStack.translate(PIVOT_X, PIVOT_Y, PIVOT_Z);
++        poseStack.mulPose(Axis.ZP.rotationDegrees(angle));
++        poseStack.translate(-PIVOT_X, -PIVOT_Y, -PIVOT_Z);
++
++        wheel.light(light).renderInto(poseStack, buffer);
++
++        poseStack.popPose();
++    }
++
++    private static float horizontalAngle(Direction facing) {
++        switch (facing) {
++            case EAST: return 270;
++            case SOUTH: return 180;
++            case WEST: return 90;
++            case NORTH:
++            default: return 0;
++        }
++    }
++}
+diff --git a/src/main/java/com/deltasf/createpropulsion/helm/SyncHelmWheelPacket.java b/src/main/java/com/deltasf/createpropulsion/helm/SyncHelmWheelPacket.java
+new file mode 100644
+index 0000000..2fd88dc
+--- /dev/null
++++ b/src/main/java/com/deltasf/createpropulsion/helm/SyncHelmWheelPacket.java
+@@ -0,0 +1,34 @@
++package com.deltasf.createpropulsion.helm;
++
++import java.util.function.Supplier;
++
++import net.minecraft.core.BlockPos;
++import net.minecraft.network.FriendlyByteBuf;
++import net.minecraftforge.fml.loading.FMLEnvironment;
++import net.minecraftforge.network.NetworkEvent;
++
++/** S2C: syncs a helm's wheel angle to clients tracking its chunk. */
++public class SyncHelmWheelPacket {
++    private final BlockPos pos;
++    private final int wheelAngle;
++
++    public SyncHelmWheelPacket(BlockPos pos, int wheelAngle) {
++        this.pos = pos;
++        this.wheelAngle = wheelAngle;
++    }
++
++    public SyncHelmWheelPacket(FriendlyByteBuf buf) {
++        this.pos = buf.readBlockPos();
++        this.wheelAngle = buf.readVarInt();
++    }
++
++    public void encode(FriendlyByteBuf buf) {
++        buf.writeBlockPos(pos);
++        buf.writeVarInt(wheelAngle);
++    }
++
++    public void handle(Supplier<NetworkEvent.Context> context) {
++        if (FMLEnvironment.dist.isClient()) HelmClientHandler.handleWheelAngle(pos, wheelAngle);
++        context.get().setPacketHandled(true);
++    }
++}
+diff --git a/src/main/java/com/deltasf/createpropulsion/network/PropulsionPackets.java b/src/main/java/com/deltasf/createpropulsion/network/PropulsionPackets.java
+index 7c084b9..fa5cb80 100644
+--- a/src/main/java/com/deltasf/createpropulsion/network/PropulsionPackets.java
++++ b/src/main/java/com/deltasf/createpropulsion/network/PropulsionPackets.java
+@@ -5,6 +5,7 @@ import com.deltasf.createpropulsion.balloons.network.BalloonDeltaPacket;
+ import com.deltasf.createpropulsion.balloons.network.BalloonDestroyPacket;
+ import com.deltasf.createpropulsion.balloons.network.BalloonStructureSyncPacket;
+ import com.deltasf.createpropulsion.balloons.network.BalloonUpdatePacket;
++import com.deltasf.createpropulsion.helm.SyncHelmWheelPacket;
+ import com.deltasf.createpropulsion.physics_assembler.packets.AssemblyFailedPacket;
+ import com.deltasf.createpropulsion.physics_assembler.packets.GaugeInsertionErrorPacket;
+ import com.deltasf.createpropulsion.physics_assembler.packets.GaugeUsedPacket;
+@@ -93,6 +94,12 @@ public class PropulsionPackets {
+                 .decoder(SyncBladePropertiesPacket::decode)
+                 .consumerMainThread(SyncBladePropertiesPacket::handle)
+                 .add();
++
++        INSTANCE.messageBuilder(SyncHelmWheelPacket.class, id(), NetworkDirection.PLAY_TO_CLIENT)
++                .encoder(SyncHelmWheelPacket::encode)
++                .decoder(SyncHelmWheelPacket::new)
++                .consumerMainThread(SyncHelmWheelPacket::handle)
++                .add();
+     }
+ 
+     public static <MSG> void sendToPlayer(MSG message, ServerPlayer player) {
+diff --git a/src/main/java/com/deltasf/createpropulsion/registries/PropulsionBlockEntities.java b/src/main/java/com/deltasf/createpropulsion/registries/PropulsionBlockEntities.java
+index bf61c0e..07f55d4 100644
+--- a/src/main/java/com/deltasf/createpropulsion/registries/PropulsionBlockEntities.java
++++ b/src/main/java/com/deltasf/createpropulsion/registries/PropulsionBlockEntities.java
+@@ -12,6 +12,8 @@ import com.deltasf.createpropulsion.heat.burners.solid.SolidBurnerBlockEntity;
+ import com.deltasf.createpropulsion.heat.engine.StirlingEngineBlockEntity;
+ import com.deltasf.createpropulsion.heat.engine.StirlingEngineRenderer;
+ import com.deltasf.createpropulsion.heat.engine.StirlingEngineVisual;
++import com.deltasf.createpropulsion.helm.RedstoneHelmBlockEntity;
++import com.deltasf.createpropulsion.helm.RedstoneHelmRenderer;
+ import com.deltasf.createpropulsion.lodestone_tracker.LodestoneTrackerBlockEntity;
+ import com.deltasf.createpropulsion.lodestone_tracker.LodestoneTrackerRenderer;
+ import com.deltasf.createpropulsion.magnet.RedstoneMagnetBlockEntity;
+@@ -163,4 +165,10 @@ public class PropulsionBlockEntities {
+         REGISTRATE.blockEntity("impact_sensor_block_entity", ImpactSensorBlockEntity::new)
+         .validBlock(PropulsionBlocks.IMPACT_SENSOR_BLOCK)
+         .register();*/
++
++    public static final BlockEntityEntry<RedstoneHelmBlockEntity> REDSTONE_HELM_BLOCK_ENTITY =
++            REGISTRATE.blockEntity("redstone_helm_block_entity", RedstoneHelmBlockEntity::new)
++                    .validBlock(PropulsionBlocks.REDSTONE_HELM_BLOCK)
++                    .renderer(() -> RedstoneHelmRenderer::new)
++                    .register();
+ }
+\ No newline at end of file
+diff --git a/src/main/java/com/deltasf/createpropulsion/registries/PropulsionBlocks.java b/src/main/java/com/deltasf/createpropulsion/registries/PropulsionBlocks.java
+index af1c53e..ef3b95d 100644
+--- a/src/main/java/com/deltasf/createpropulsion/registries/PropulsionBlocks.java
++++ b/src/main/java/com/deltasf/createpropulsion/registries/PropulsionBlocks.java
+@@ -6,6 +6,7 @@ import com.deltasf.createpropulsion.balloons.envelopes.EnvelopedShaftBlock;
+ import com.deltasf.createpropulsion.balloons.injectors.hot_air_burner.HotAirBurnerBlock;
+ import com.deltasf.createpropulsion.balloons.injectors.hot_air_pump.HotAirPumpBlock;
+ import com.deltasf.createpropulsion.heat.burners.liquid.LiquidBurnerBlock;
++import com.deltasf.createpropulsion.helm.RedstoneHelmBlock;
+ import com.deltasf.createpropulsion.heat.burners.solid.SolidBurnerBlock;
+ import com.deltasf.createpropulsion.heat.engine.StirlingEngineBlock;
+ import com.deltasf.createpropulsion.lodestone_tracker.LodestoneTrackerBlock;
+@@ -49,6 +50,7 @@ import net.minecraft.world.item.Item;
+ import net.minecraft.world.item.Items;
+ import net.minecraft.world.level.ItemLike;
+ import net.minecraft.world.level.block.Block;
++import net.minecraft.world.level.block.Blocks;
+ import net.minecraft.world.level.block.SoundType;
+ import net.minecraft.world.level.material.MapColor;
+ import net.minecraft.world.level.storage.loot.LootPool;
+@@ -475,4 +477,14 @@ public class PropulsionBlocks {
+     public static BlockEntry<EnvelopedShaftBlock> getEnvelopedShaft(EnvelopeColor color) {
+         return ENVELOPED_SHAFT_BLOCKS.get(color);
+     }
++
++    //Redstone helm (ported from Valkyrien Sails, MIT)
++    public static final BlockEntry<RedstoneHelmBlock> REDSTONE_HELM_BLOCK = REGISTRATE.block("redstone_helm", RedstoneHelmBlock::new)
++            .initialProperties(() -> Blocks.SPRUCE_PLANKS)
++            .properties(p -> p.noOcclusion())
++            .tag(BlockTags.MINEABLE_WITH_AXE)
++            .blockstate(FUCK_OFF())
++            .item().model(FUCK_OFF_ITEM()).build()
++            .setData(ProviderType.LANG, FUCK_OFF_LANG())
++            .register();
+ }
+\ No newline at end of file
+diff --git a/src/main/java/com/deltasf/createpropulsion/registries/PropulsionCreativeTab.java b/src/main/java/com/deltasf/createpropulsion/registries/PropulsionCreativeTab.java
+index 8077dc9..4c0c9b1 100644
+--- a/src/main/java/com/deltasf/createpropulsion/registries/PropulsionCreativeTab.java
++++ b/src/main/java/com/deltasf/createpropulsion/registries/PropulsionCreativeTab.java
+@@ -75,6 +75,7 @@ public class PropulsionCreativeTab {
+             output.accept(PropulsionItems.ANDESITE_BLADE);
+ 
+             output.accept(PropulsionBlocks.TILT_ADAPTER_BLOCK);
++            output.accept(PropulsionBlocks.REDSTONE_HELM_BLOCK);
+         }
+     }
+ }
+\ No newline at end of file
+diff --git a/src/main/java/com/deltasf/createpropulsion/registries/PropulsionPartialModels.java b/src/main/java/com/deltasf/createpropulsion/registries/PropulsionPartialModels.java
+index 3e35b39..e6f05b3 100644
+--- a/src/main/java/com/deltasf/createpropulsion/registries/PropulsionPartialModels.java
++++ b/src/main/java/com/deltasf/createpropulsion/registries/PropulsionPartialModels.java
+@@ -42,6 +42,8 @@ public class PropulsionPartialModels {
+     //Transmission
+     public static final PartialModel TRANSMISSION_PLUS = partial("transmission_plus");
+     public static final PartialModel TRANSMISSION_MINUS = partial("transmission_minus");
++    //Redstone helm
++    public static final PartialModel REDSTONE_HELM_WHEEL = partial("redstone_helm_wheel");
+     //Hot air pump
+     public static final PartialModel HOT_AIR_PUMP_COG = partial("hot_air_pump_cogwheel");
+     public static final PartialModel HOT_AIR_PUMP_MEMBRANE = partial("hot_air_pump_membrane");
+diff --git a/src/main/resources/assets/createpropulsion/blockstates/redstone_helm.json b/src/main/resources/assets/createpropulsion/blockstates/redstone_helm.json
+new file mode 100644
+index 0000000..4b811ac
+--- /dev/null
++++ b/src/main/resources/assets/createpropulsion/blockstates/redstone_helm.json
+@@ -0,0 +1,64 @@
++{
++  "variants": {
++    "facing=east,right=true,left=false": {
++      "model": "createpropulsion:block/redstone_helm_block_base_right",
++      "y": 90
++    },
++    "facing=east,right=false,left=true": {
++      "model": "createpropulsion:block/redstone_helm_block_base_left",
++      "y": 90
++    },
++    "facing=east,right=false,left=false": {
++      "model": "createpropulsion:block/redstone_helm_block_base",
++      "y": 90
++    },
++    "facing=east,right=true,left=true": {
++      "model": "createpropulsion:block/redstone_helm_block_base",
++      "y": 90
++    },
++    "facing=north,right=true,left=false": {
++      "model": "createpropulsion:block/redstone_helm_block_base_right"
++    },
++    "facing=north,right=false,left=true": {
++      "model": "createpropulsion:block/redstone_helm_block_base_left"
++    },
++    "facing=north,right=false,left=false": {
++      "model": "createpropulsion:block/redstone_helm_block_base"
++    },
++    "facing=north,right=true,left=true": {
++      "model": "createpropulsion:block/redstone_helm_block_base"
++    },
++    "facing=south,right=true,left=false": {
++      "model": "createpropulsion:block/redstone_helm_block_base_right",
++      "y": 180
++    },
++    "facing=south,right=false,left=true": {
++      "model": "createpropulsion:block/redstone_helm_block_base_left",
++      "y": 180
++    },
++    "facing=south,right=false,left=false": {
++      "model": "createpropulsion:block/redstone_helm_block_base",
++      "y": 180
++    },
++    "facing=south,right=true,left=true": {
++      "model": "createpropulsion:block/redstone_helm_block_base",
++      "y": 180
++    },
++    "facing=west,right=true,left=false": {
++      "model": "createpropulsion:block/redstone_helm_block_base_right",
++      "y": 270
++    },
++    "facing=west,right=false,left=true": {
++      "model": "createpropulsion:block/redstone_helm_block_base_left",
++      "y": 270
++    },
++    "facing=west,right=false,left=false": {
++      "model": "createpropulsion:block/redstone_helm_block_base",
++      "y": 270
++    },
++    "facing=west,right=true,left=true": {
++      "model": "createpropulsion:block/redstone_helm_block_base",
++      "y": 270
++    }
++  }
++}
+diff --git a/src/main/resources/assets/createpropulsion/lang/en_us.json b/src/main/resources/assets/createpropulsion/lang/en_us.json
+index ca126f1..6de3fce 100644
+--- a/src/main/resources/assets/createpropulsion/lang/en_us.json
++++ b/src/main/resources/assets/createpropulsion/lang/en_us.json
+@@ -302,5 +302,7 @@
+   "createpropulsion.ponder.shared.multiblock_efficiency.efficiency_1": "§fA §32x2x2 §fthruster is slightly more fuel-efficient than 8 singular thrusters.",
+   "createpropulsion.ponder.shared.multiblock_efficiency.efficiency_2": "§fA §33x3x3 §fthruster is is even more fuel-efficient, and also gains oxidizer efficiency.",
+ 
+-  "sounds.createpropulsion.prop_loop": "Propeller spinning"
+-}
+\ No newline at end of file
++  "sounds.createpropulsion.prop_loop": "Propeller spinning",
++  "block.createpropulsion.redstone_helm": "Redstone Ship's Helm",
++  "item.createpropulsion.redstone_helm": "Redstone Ship's Helm"
++}
+diff --git a/src/main/resources/assets/createpropulsion/models/block/redstone_helm_block_base.json b/src/main/resources/assets/createpropulsion/models/block/redstone_helm_block_base.json
+new file mode 100644
+index 0000000..8cd4f81
+--- /dev/null
++++ b/src/main/resources/assets/createpropulsion/models/block/redstone_helm_block_base.json
+@@ -0,0 +1,81 @@
++{
++	"format_version": "1.21.6",
++	"credit": "Made with Blockbench",
++	"texture_size": [24, 24],
++	"textures": {
++		"2": "createpropulsion:block/redstone_helm_block",
++		"particle": "block/dark_oak_planks"
++	},
++	"elements": [
++		{
++			"from": [5, 12, 3],
++			"to": [7, 14, 11],
++			"faces": {
++				"north": {"uv": [4, 6.66667, 5.33333, 8], "texture": "#2"},
++				"east": {"uv": [0, 6.66667, 5.33333, 8], "texture": "#2"},
++				"south": {"uv": [0, 6.66667, 1.33333, 8], "texture": "#2"},
++				"west": {"uv": [0, 6.66667, 5.33333, 8], "texture": "#2"},
++				"up": {"uv": [0.66667, 6, 2, 11.33333], "texture": "#2"},
++				"down": {"uv": [0.66667, 6, 2, 11.33333], "texture": "#2"}
++			}
++		},
++		{
++			"from": [5, 14, 3],
++			"to": [11, 16, 11],
++			"faces": {
++				"north": {"uv": [5.33333, 5.33333, 9.33333, 6.66667], "texture": "#2"},
++				"east": {"uv": [0, 5.33333, 5.33333, 6.66667], "texture": "#2"},
++				"south": {"uv": [5.33333, 5.33333, 9.33333, 6.66667], "texture": "#2"},
++				"west": {"uv": [0, 5.33333, 5.33333, 6.66667], "texture": "#2"},
++				"up": {"uv": [9.33333, 5.33333, 13.33333, 11.33333], "texture": "#2"},
++				"down": {"uv": [9.33333, 5.33333, 13.33333, 11.33333], "texture": "#2"}
++			}
++		},
++		{
++			"from": [9, 12, 3],
++			"to": [11, 14, 11],
++			"faces": {
++				"north": {"uv": [0, 6.66667, 1.33333, 8], "texture": "#2"},
++				"east": {"uv": [0, 6.66667, 5.33333, 8], "texture": "#2"},
++				"south": {"uv": [4, 6.66667, 5.33333, 8], "texture": "#2"},
++				"west": {"uv": [0, 6.66667, 5.33333, 8], "texture": "#2"},
++				"up": {"uv": [0.66667, 6, 2, 11.33333], "texture": "#2"},
++				"down": {"uv": [0.66667, 6, 2, 11.33333], "texture": "#2"}
++			}
++		},
++		{
++			"from": [5, 2, 3],
++			"to": [11, 12, 11],
++			"faces": {
++				"north": {"uv": [5.33334, 8, 9.33334, 14.66667], "texture": "#2"},
++				"east": {"uv": [0, 8, 5.33333, 14.66667], "texture": "#2"},
++				"south": {"uv": [5.33334, 8, 9.33334, 14.66667], "texture": "#2"},
++				"west": {"uv": [0, 8, 5.33333, 14.66667], "texture": "#2"},
++				"up": {"uv": [5.33334, 8.66666, 9.33334, 14], "texture": "#2"},
++				"down": {"uv": [5.33334, 8.66666, 9.33334, 14], "texture": "#2"}
++			}
++		},
++		{
++			"from": [0, 0, 3],
++			"to": [16, 2, 11],
++			"faces": {
++				"north": {"uv": [0, 0, 10.66667, 1.33333], "texture": "#2"},
++				"east": {"uv": [9.33333, 0, 10.66667, 5.33333], "rotation": 270, "texture": "#2"},
++				"south": {"uv": [0, 0, 10.66667, 1.33333], "texture": "#2"},
++				"west": {"uv": [0, 0, 1.33333, 5.33333], "rotation": 90, "texture": "#2"},
++				"up": {"uv": [0, 0, 10.66667, 5.33333], "texture": "#2"},
++				"down": {"uv": [0, 0, 10.66667, 5.33333], "texture": "#2"}
++			}
++		}
++	],
++	"display": {
++		"firstperson_righthand": {
++			"rotation": [0, -45, 0],
++			"scale": [0.625, 0.625, 0.625]
++		},
++		"gui": {
++			"rotation": [30, 45, 0],
++			"scale": [0.625, 0.625, 0.625]
++		}
++	}
++}
+\ No newline at end of file
+diff --git a/src/main/resources/assets/createpropulsion/models/block/redstone_helm_block_base_left.json b/src/main/resources/assets/createpropulsion/models/block/redstone_helm_block_base_left.json
+new file mode 100644
+index 0000000..4cc5b2f
+--- /dev/null
++++ b/src/main/resources/assets/createpropulsion/models/block/redstone_helm_block_base_left.json
+@@ -0,0 +1,6 @@
++{
++	"parent": "createpropulsion:block/redstone_helm_block_base",
++	"textures": {
++		"2": "createpropulsion:block/redstone_helm_block_left"
++	}
++}
+\ No newline at end of file
+diff --git a/src/main/resources/assets/createpropulsion/models/block/redstone_helm_block_base_right.json b/src/main/resources/assets/createpropulsion/models/block/redstone_helm_block_base_right.json
+new file mode 100644
+index 0000000..077f16e
+--- /dev/null
++++ b/src/main/resources/assets/createpropulsion/models/block/redstone_helm_block_base_right.json
+@@ -0,0 +1,6 @@
++{
++	"parent": "createpropulsion:block/redstone_helm_block_base",
++	"textures": {
++		"2": "createpropulsion:block/redstone_helm_block_right"
++	}
++}
+\ No newline at end of file
+diff --git a/src/main/resources/assets/createpropulsion/models/item/redstone_helm.json b/src/main/resources/assets/createpropulsion/models/item/redstone_helm.json
+new file mode 100644
+index 0000000..3429bb0
+--- /dev/null
++++ b/src/main/resources/assets/createpropulsion/models/item/redstone_helm.json
+@@ -0,0 +1,3 @@
++{
++  "parent": "createpropulsion:block/redstone_helm_block_base"
++}
+diff --git a/src/main/resources/assets/createpropulsion/models/partial/redstone_helm_wheel.json b/src/main/resources/assets/createpropulsion/models/partial/redstone_helm_wheel.json
+new file mode 100644
+index 0000000..18c1b36
+--- /dev/null
++++ b/src/main/resources/assets/createpropulsion/models/partial/redstone_helm_wheel.json
+@@ -0,0 +1,788 @@
++{
++  "format_version": "1.21.6",
++  "credit": "Made with Blockbench",
++  "texture_size": [
++    24,
++    24
++  ],
++  "textures": {
++    "0": "createpropulsion:block/redstone_helm_wheel",
++    "particle": "block/dark_oak_planks"
++  },
++  "elements": [
++    {
++      "from": [
++        7,
++        1,
++        11
++      ],
++      "to": [
++        9,
++        25,
++        13
++      ],
++      "rotation": {
++        "angle": 0,
++        "axis": "y",
++        "origin": [
++          8,
++          13,
++          12
++        ]
++      },
++      "faces": {
++        "north": {
++          "uv": [
++            0,
++            0,
++            1.33333,
++            16
++          ],
++          "texture": "#0"
++        },
++        "east": {
++          "uv": [
++            0,
++            0,
++            1.33333,
++            16
++          ],
++          "texture": "#0"
++        },
++        "south": {
++          "uv": [
++            0,
++            0,
++            1.33333,
++            16
++          ],
++          "texture": "#0"
++        },
++        "west": {
++          "uv": [
++            0,
++            0,
++            1.33333,
++            16
++          ],
++          "texture": "#0"
++        },
++        "up": {
++          "uv": [
++            0,
++            0,
++            1.33333,
++            1.33333
++          ],
++          "texture": "#0"
++        },
++        "down": {
++          "uv": [
++            0,
++            14.66667,
++            1.33333,
++            16
++          ],
++          "texture": "#0"
++        }
++      }
++    },
++    {
++      "from": [
++        -4,
++        12,
++        11
++      ],
++      "to": [
++        20,
++        14,
++        13
++      ],
++      "rotation": {
++        "angle": 0,
++        "axis": "y",
++        "origin": [
++          8,
++          13,
++          12
++        ]
++      },
++      "faces": {
++        "north": {
++          "uv": [
++            0,
++            0,
++            1.33333,
++            16
++          ],
++          "rotation": 90,
++          "texture": "#0"
++        },
++        "east": {
++          "uv": [
++            0,
++            14.66667,
++            1.33333,
++            16
++          ],
++          "rotation": 90,
++          "texture": "#0"
++        },
++        "south": {
++          "uv": [
++            0,
++            0,
++            1.33333,
++            16
++          ],
++          "rotation": 90,
++          "texture": "#0"
++        },
++        "west": {
++          "uv": [
++            0,
++            0,
++            1.33333,
++            1.33333
++          ],
++          "rotation": 90,
++          "texture": "#0"
++        },
++        "up": {
++          "uv": [
++            0,
++            0,
++            1.33333,
++            16
++          ],
++          "rotation": 90,
++          "texture": "#0"
++        },
++        "down": {
++          "uv": [
++            0,
++            0,
++            1.33333,
++            16
++          ],
++          "rotation": 90,
++          "texture": "#0"
++        }
++      }
++    },
++    {
++      "from": [
++        -4,
++        12,
++        11
++      ],
++      "to": [
++        20,
++        14,
++        13
++      ],
++      "rotation": {
++        "angle": 45,
++        "axis": "z",
++        "origin": [
++          8,
++          13,
++          12
++        ]
++      },
++      "faces": {
++        "north": {
++          "uv": [
++            0,
++            0,
++            1.33333,
++            16
++          ],
++          "rotation": 90,
++          "texture": "#0"
++        },
++        "east": {
++          "uv": [
++            0,
++            0,
++            1.33333,
++            1.33333
++          ],
++          "rotation": 90,
++          "texture": "#0"
++        },
++        "south": {
++          "uv": [
++            0,
++            0,
++            1.33333,
++            16
++          ],
++          "rotation": 90,
++          "texture": "#0"
++        },
++        "west": {
++          "uv": [
++            0,
++            14.66667,
++            1.33333,
++            16
++          ],
++          "rotation": 90,
++          "texture": "#0"
++        },
++        "up": {
++          "uv": [
++            0,
++            0,
++            1.33333,
++            16
++          ],
++          "rotation": 90,
++          "texture": "#0"
++        },
++        "down": {
++          "uv": [
++            0,
++            0,
++            1.33333,
++            16
++          ],
++          "rotation": 90,
++          "texture": "#0"
++        }
++      }
++    },
++    {
++      "from": [
++        7,
++        1,
++        11
++      ],
++      "to": [
++        9,
++        25,
++        13
++      ],
++      "rotation": {
++        "angle": 45,
++        "axis": "z",
++        "origin": [
++          8,
++          13,
++          12
++        ]
++      },
++      "faces": {
++        "north": {
++          "uv": [
++            0,
++            0,
++            1.33333,
++            16
++          ],
++          "texture": "#0"
++        },
++        "east": {
++          "uv": [
++            0,
++            0,
++            1.33333,
++            16
++          ],
++          "texture": "#0"
++        },
++        "south": {
++          "uv": [
++            0,
++            0,
++            1.33333,
++            16
++          ],
++          "texture": "#0"
++        },
++        "west": {
++          "uv": [
++            0,
++            0,
++            1.33333,
++            16
++          ],
++          "texture": "#0"
++        },
++        "up": {
++          "uv": [
++            0,
++            0,
++            1.33333,
++            1.33333
++          ],
++          "texture": "#0"
++        },
++        "down": {
++          "uv": [
++            0,
++            14.66667,
++            1.33333,
++            16
++          ],
++          "texture": "#0"
++        }
++      }
++    },
++    {
++      "from": [
++        3,
++        5,
++        10.9
++      ],
++      "to": [
++        13,
++        8,
++        13.1
++      ],
++      "rotation": {
++        "angle": 0,
++        "axis": "y",
++        "origin": [
++          8,
++          13,
++          12
++        ]
++      },
++      "faces": {
++        "north": {
++          "uv": [
++            3.33333,
++            11.33334,
++            10,
++            13.33334
++          ],
++          "texture": "#0"
++        },
++        "east": {
++          "uv": [
++            8.66666,
++            11.33334,
++            10,
++            13.33334
++          ],
++          "texture": "#0"
++        },
++        "south": {
++          "uv": [
++            3.33333,
++            11.33334,
++            10,
++            13.33334
++          ],
++          "texture": "#0"
++        },
++        "west": {
++          "uv": [
++            3.33333,
++            11.33334,
++            4.66666,
++            13.33334
++          ],
++          "texture": "#0"
++        },
++        "up": {
++          "uv": [
++            3.33333,
++            12,
++            10,
++            13.33334
++          ],
++          "texture": "#0"
++        },
++        "down": {
++          "uv": [
++            3.33333,
++            12,
++            10,
++            13.33334
++          ],
++          "texture": "#0"
++        }
++      }
++    },
++    {
++      "from": [
++        3,
++        18,
++        10.9
++      ],
++      "to": [
++        13,
++        21,
++        13.1
++      ],
++      "rotation": {
++        "angle": 0,
++        "axis": "y",
++        "origin": [
++          8,
++          13,
++          12
++        ]
++      },
++      "faces": {
++        "north": {
++          "uv": [
++            3.33333,
++            2.66667,
++            10,
++            4.66667
++          ],
++          "texture": "#0"
++        },
++        "east": {
++          "uv": [
++            8.66666,
++            2.66667,
++            10,
++            4.66667
++          ],
++          "texture": "#0"
++        },
++        "south": {
++          "uv": [
++            3.33333,
++            2.66667,
++            10,
++            4.66667
++          ],
++          "texture": "#0"
++        },
++        "west": {
++          "uv": [
++            3.33333,
++            2.66667,
++            4.66666,
++            4.66667
++          ],
++          "texture": "#0"
++        },
++        "up": {
++          "uv": [
++            3.33333,
++            3.33333,
++            10,
++            4.66667
++          ],
++          "texture": "#0"
++        },
++        "down": {
++          "uv": [
++            3.33333,
++            3.33333,
++            10,
++            4.66667
++          ],
++          "texture": "#0"
++        }
++      }
++    },
++    {
++      "from": [
++        0,
++        8,
++        10.9
++      ],
++      "to": [
++        3,
++        18,
++        13.1
++      ],
++      "rotation": {
++        "angle": 0,
++        "axis": "y",
++        "origin": [
++          8,
++          13,
++          12
++        ]
++      },
++      "faces": {
++        "north": {
++          "uv": [
++            1.33333,
++            4.66666,
++            3.33333,
++            11.33333
++          ],
++          "texture": "#0"
++        },
++        "east": {
++          "uv": [
++            1.33333,
++            4.66666,
++            2.66667,
++            11.33333
++          ],
++          "texture": "#0"
++        },
++        "south": {
++          "uv": [
++            1.33333,
++            4.66666,
++            3.33333,
++            11.33333
++          ],
++          "texture": "#0"
++        },
++        "west": {
++          "uv": [
++            1.33333,
++            4.66666,
++            2.66667,
++            11.33333
++          ],
++          "texture": "#0"
++        },
++        "up": {
++          "uv": [
++            1.33333,
++            4.66666,
++            3.33333,
++            6
++          ],
++          "texture": "#0"
++        },
++        "down": {
++          "uv": [
++            1.33333,
++            10,
++            3.33333,
++            11.33333
++          ],
++          "texture": "#0"
++        }
++      }
++    },
++    {
++      "from": [
++        13,
++        8,
++        10.9
++      ],
++      "to": [
++        16,
++        18,
++        13.1
++      ],
++      "rotation": {
++        "angle": 0,
++        "axis": "y",
++        "origin": [
++          8,
++          13,
++          12
++        ]
++      },
++      "faces": {
++        "north": {
++          "uv": [
++            10,
++            4.66666,
++            12,
++            11.33333
++          ],
++          "texture": "#0"
++        },
++        "east": {
++          "uv": [
++            10,
++            4.66666,
++            11.33334,
++            11.33333
++          ],
++          "texture": "#0"
++        },
++        "south": {
++          "uv": [
++            10,
++            4.66666,
++            12,
++            11.33333
++          ],
++          "texture": "#0"
++        },
++        "west": {
++          "uv": [
++            10,
++            4.66666,
++            11.33334,
++            11.33333
++          ],
++          "texture": "#0"
++        },
++        "up": {
++          "uv": [
++            10,
++            4.66666,
++            12,
++            6
++          ],
++          "texture": "#0"
++        },
++        "down": {
++          "uv": [
++            10,
++            10,
++            12,
++            11.33333
++          ],
++          "texture": "#0"
++        }
++      }
++    },
++    {
++      "from": [
++        6,
++        11,
++        2
++      ],
++      "to": [
++        10,
++        15,
++        14
++      ],
++      "rotation": {
++        "angle": 0,
++        "axis": "y",
++        "origin": [
++          8,
++          13,
++          12
++        ]
++      },
++      "faces": {
++        "north": {
++          "uv": [
++            1.33333,
++            0,
++            4,
++            2.66666
++          ],
++          "texture": "#0"
++        },
++        "east": {
++          "uv": [
++            4,
++            0,
++            10.66667,
++            2.66667
++          ],
++          "texture": "#0"
++        },
++        "south": {
++          "uv": [
++            1.33333,
++            0,
++            4,
++            2.66666
++          ],
++          "texture": "#0"
++        },
++        "west": {
++          "uv": [
++            4,
++            0,
++            10.66667,
++            2.66667
++          ],
++          "texture": "#0"
++        },
++        "up": {
++          "uv": [
++            4,
++            0,
++            6.66667,
++            2.66667
++          ],
++          "texture": "#0"
++        },
++        "down": {
++          "uv": [
++            4,
++            0,
++            6.66667,
++            2.66667
++          ],
++          "texture": "#0"
++        }
++      }
++    },
++    {
++      "from": [
++        6.9,
++        23,
++        10.9
++      ],
++      "to": [
++        9.1,
++        24,
++        13.1
++      ],
++      "faces": {
++        "north": {
++          "uv": [
++            4,
++            1.33334,
++            5.33333,
++            2
++          ],
++          "texture": "#0"
++        },
++        "east": {
++          "uv": [
++            4,
++            1.33334,
++            5.33333,
++            2
++          ],
++          "texture": "#0"
++        },
++        "south": {
++          "uv": [
++            4,
++            1.33334,
++            5.33333,
++            2
++          ],
++          "texture": "#0"
++        },
++        "west": {
++          "uv": [
++            4,
++            1.33334,
++            5.33333,
++            2
++          ],
++          "texture": "#0"
++        },
++        "up": {
++          "uv": [
++            4,
++            0.66667,
++            5.33333,
++            2
++          ],
++          "texture": "#0"
++        },
++        "down": {
++          "uv": [
++            4,
++            0.66667,
++            5.33333,
++            2
++          ],
++          "texture": "#0"
++        }
++      }
++    }
++  ],
++  "gui_light": "front"
++}
+\ No newline at end of file
+diff --git a/src/main/resources/assets/createpropulsion/textures/block/redstone_helm_block.png b/src/main/resources/assets/createpropulsion/textures/block/redstone_helm_block.png
+new file mode 100644
+index 0000000000000000000000000000000000000000..ed184cf485b7553920390fcfa661952c80e8f742
+GIT binary patch
+literal 834
+zcmV-I1HJr-P)<h;3K|Lk000e1NJLTq000;O000;W1^@s6;CDUv0008_Nkl<Zcma%*
+zOG{f}5Qg6zst8^pNDvVhLJ;gmC}tr@QE}nYZM$gyL+iHs14>DMLU3VMrEYX3q6KlG
+zqIM(LfKYEp6}*BNN_w7w37?0U81kN(Z{Bz2oB7Tqnwgm?Pfbmgu>c?B^Z9Z<20p+C
+z_~`Jls`HEP?(Q@=IH+tktN#9e^M{9r)!W-^z=!YZ>QY-<n+663Ov}2xy}eF(DMC>y
+zmGtoNAU4Clxw+B({k^b&7-(*8RzpLBfxP46V@yp%FTQ@!w|DQ=(a~W*O%b=Pt*vqp
+z18g??=B>zOT?^5#e<}S|s?srH3b<twe9+X?B!Ev2x%jmZz5Mt=pMQKe4V^m(;A7c@
+zqq?}buw&ymr)LYwO@D%}iKx4~+qy?ZcMhg-ACAo$8yoHX{a$d-;A$bdyu8%r=B7?h
+zPjzr`pzZB#!}<BSt%>dJ?U`nGch@Xy^lVhCI9#;0wx*q(9W5*@Xl`y!i;IhzpPyHu
+zP_Q*|*Q~Ct3ZU`$`1p7^m&;W^(Gd2SrsF4NbaYgclam@78`H$ZgocKOluoBjo8-ed
+z?+-b^#EDCEb#<j|U*Dr}aerTb&(17XjW;5`yoz5?bZE%&jbp0vw+RqjUtjC+@K6Xd
+zot+}tRY~6CSafVc4(lXr0|XStG7Yw+r9~7bfpy4xoTlI@j>hA}91+j7FA(y*VUwRL
+zD;BQC8xdb9$kY^Pl29Ad_O}V}DB9E0BRXfzW?@3edz`|6;^gq2U_(TiOeS3G<mBYh
+z`YE375z>es)sr_FAqg(Tr?aplV$OT~&(V?A*VnbYyln3db&{|nVnhm3#BU}s?+8ES
+ziEnIdq(J<3o5f#RT1r*jfS?y)WX_vdh>#EC^?aMaN2fTQG6hcu6Hy?^dmOGFYy%P~
+zNO3xSJu+f%vOg_J-sAO(!`lWF1{5cFdwXl255Jjkz<H0Otq1!SA>w%aD6n+R&BP{o
+z;>4Z<n;`kPZEbC-SS(iZlYE7EhVvf)0RR7Y1Td5U000I_L_t&o0PH0egM4Imr~m)}
+M07*qoM6N<$f=~sK-2eap
+
+literal 0
+HcmV?d00001
+
+diff --git a/src/main/resources/assets/createpropulsion/textures/block/redstone_helm_block_left.png b/src/main/resources/assets/createpropulsion/textures/block/redstone_helm_block_left.png
+new file mode 100644
+index 0000000000000000000000000000000000000000..acfca760fc3d60291e0219386a5e55c9fedc9866
+GIT binary patch
+literal 842
+zcmV-Q1GW5#P)<h;3K|Lk000e1NJLTq000;O000;W1^@s6;CDUv00092Nkl<Zcma%*
+z%S&5P5XQ$tm4J@~B#4L$AqcK4#ViCVDlS~QZP$fDp*y$LKcJM<{~&eYrW+U4m53>b
+z3k_;Ff(;1ug;XI=2nlU^e*+Vax0)F8-I+7rcjj^K!!0i_Hx?Hc8(4r3QmIrU6#yUL
+z1AKJ&SZVWfl}be>CMG12NXXdOnEF#wQ!+9#qQHkA92}IszCIZrA6G5wSS;2iy@*3m
+zuh*qks|m&MOQn)jt5v}QVxYUbTRJ;C73{mbyu`GG`?#_qu{ZCezrSCBnj~g>dwaz|
+z3{Y(K)oXe7`4h{QaNk@+vVUE(W7H%t%Ov<95{U@F|0x~v<4*@}OSsJYxAOe!7ZuUD
+zfdD?1A{^D--JKpA$GNncmgLe0=$3FpLqpm<D!MZ;h52w4>+0&#^S67!J%einm(S<r
+z;NU>6udn6o>`V?14;8n!x4I^Fa&n@Y<KttstkF}bRdP7DySpn#M@O=;u_0?~YqGhy
+zDeLR&l1`^}P24n@Ohy12i_gu?HIm6>6D0Mak7+b`Qf6jmWMN@JW@l$*etupiCnqHu
+zjjA@x`*GeM_5c-!F0N20NMdyKUO0DpD!*@TH1-g$L~wZ#yrAgNu*V7qRP(PBASf1#
+za(;d;2;&0-!e&#2d5dGwQG`9L!_Wc<NQ`9~Y)?;*keCguecs|U1y6D`7AIzKJkz#7
+z$oGaK-*<L2{1C51a3LX6lblI>Z9wZ^C%_}=@bIwEIctjf8+_j4BnBjB5AO-qhl|JK
+z{#vfCuI{ZL<LMqDjo48=dXo{d!G!p9=66KQc#HqKxRAZQJ=xyg)^~?IVdxPtA_+-i
+zH<Orkgzxjj_xJZZK=5{}#oyZ6`tR$f1*mFC7@6}X=ELXxcspMU*ytpuQ>NhQU?LKP
+zd5gofgBD-|2}w?;FQ=#VO}3{c%v-!&a(FF3VnA|&<#Jg+A9ge0fbkYb+Yb6ILd5ad
+zQDEtsn~4qc#ECrxIzjkx%Vx8Z%jKH;!+eu?g7Xgm0RR7=rObK&000I_L_t&o0OT+h
+UgQGn^+yDRo07*qoM6N<$f<~B$H~;_u
+
+literal 0
+HcmV?d00001
+
+diff --git a/src/main/resources/assets/createpropulsion/textures/block/redstone_helm_block_right.png b/src/main/resources/assets/createpropulsion/textures/block/redstone_helm_block_right.png
+new file mode 100644
+index 0000000000000000000000000000000000000000..ec3f4970b60bc5d6d3917b7881bd19758edfee19
+GIT binary patch
+literal 841
+zcmV-P1GfB$P)<h;3K|Lk000e1NJLTq000;O000;W1^@s6;CDUv00091Nkl<Zcma%*
+zJ4;+q6or?EC<8u5kRgazNCv?)LeN5xpkiU^FNjtCfU!vD50EesQU@zjg;+!@5e<li
+zGpK0<Ga$ql5(S?iN;0|MhCN&_I^!_w?tRu;XP>jreT2!$$<oBcM2QH<K`xgo<sy&+
+zazKucoTw_laD9EPo}M0Mvsra@by?ou->;624g)!QYip~Tnwr$z-ECgR&CShK%1Z&q
+z-QAsTZ*Rq7<d>J1y1BU#5x{}^`g+yY)*6_1aBx7Vi16&=2Yq=nrk0i#18$0VY;0_l
+z0}j|?V{bJzJ<YHp!q2}o`lXukj&W1KBb|_gR4OGvUicUEJ)}r0BD{PzuBmTd&BV?f
+z5adJ_;iyhePwm(^&KI9QDgS;PxgtVaTbu137rS%Nh39B2R##VN=kND|dxlmC;q2^8
+z`FvhSM@QP--POj%hT-Jo#Kv&j+uP>Z+S;<n7(WYDDvlObS68*UxvBa2dCktwYGGkP
+zb8~Z=nVGRMyn9wwRs`@kKRi5K>h0|<gQ9WRW15bhl)=G4jgF3LXlO_yBO~hT>r*<N
+zHg8go^SnRI0cK8I!uk2RvYnmx=;F?f{v010_mFNvba@rMp!o1G#}|&I^4~hZaB*>=
+zy}dnQ%shWCCc7)CJ5R*NBFtf&ge`!9!bG|uHZ(Md!c1Ts*PUlm=oH7}Je(u&O#1*M
+z-y0VBvAk^bL%Ipkg@SZVaXN{6Bia7e0U1Tx+uOy?8M9b?LR@#A!hqt;;XNV75i*%f
+ze5}L6!+Yb$bas!CjrdVLdXq6S!HwkXEWRT+*PZ{pzpu5mH7zYI*}FrXB<zT2k%AQQ
+zn+fMTB9H6v>+9<^AbPtkk}obU);zcXq!*!O&KoX{xE|-L<<^0>PH}ch7d#zwM1iF4
+zJX$r_0!*MF#o6iWfdPAy{b@<+&Q~jrZVONtP#p5=>dHPJelyX4>(1k?2KyFa;&}Wh
+zi0qo1NlfbSa8H4CkbK+<g@TI3VtIa2FAGmd{sRC2|Nk`Y&R+lk00v1!K~w_(<S-V4
+Tqdh;|00000NkvXXu0mjf{UMb`
+
+literal 0
+HcmV?d00001
+
+diff --git a/src/main/resources/assets/createpropulsion/textures/block/redstone_helm_wheel.png b/src/main/resources/assets/createpropulsion/textures/block/redstone_helm_wheel.png
+new file mode 100644
+index 0000000000000000000000000000000000000000..1cd07f2ca570020ad53d0eac4c20ec2e9e7466c1
+GIT binary patch
+literal 548
+zcmV+<0^9wGP)<h;3K|Lk000e1NJLTq000;O000;W1^@s6;CDUv0005mNkl<ZcmceW
+zO)ErU6vxkaPf{!`Gz%NqV24j2UqI}veFCJEWW`sokg^hyZ0uN&VWZJRO%|4>Ce3)6
+zarHZOZqJPSHls}a<~+}N`#<;Tp4&1tn)aqAhP=$qoKn7C^bGTbS@I<2*FwBlu3%(r
+zW?b#z!KHMi)4CrX=@)}I*q$6Mi1<^1?v7SXdC%vC=2thKum%Fwh&`Ck*6hPjfwtC^
+z<Z=(PymBElCmEsa{j0$3Nk%PeAhy4~r-vao3Kbw>b|aJ8I=fZQvrn?Q`zQ;m$FjJ7
+zT4U#zj$~~or%*#}6e>`udcShGHXz{IzV3E`&NeM297$l-N99`zr7tOcRuww1#%GX&
+zKMr4Dc%a7{9qd)IFK;QhdoHHn^0A;6pNm@)Cgcl{U{}F9DRDKvfZb_afh(M(#uu>0
+z+_l>zYMrD;1(<_I8k=a68WpetteuK=Qle^n0ekI|oXUig)Tltvpjnf@S`~1c*r{A!
+z+&ZeJMxc@FG10ghUw{c^YOyxa*vX+joo=&CuR*TWm|(s21?mI58GzrleCWW2jCd3(
+zz#O<q+$kS59v_Hd@fqack3$9OlX!IC@geMES6>&j4-^PWY}Tg&|2hZFo;0lP2LJ&7
+m|0!Ckn*aa+21!IgR09ADcR^<gX&40n0000<MNUMnLSTZcj`-66
+
+literal 0
+HcmV?d00001
+
+diff --git a/src/main/resources/data/createpropulsion/recipes/redstone_helm.json b/src/main/resources/data/createpropulsion/recipes/redstone_helm.json
+new file mode 100644
+index 0000000..69a6d15
+--- /dev/null
++++ b/src/main/resources/data/createpropulsion/recipes/redstone_helm.json
+@@ -0,0 +1,23 @@
++{
++  "type": "minecraft:crafting_shaped",
++  "category": "redstone",
++  "key": {
++    "W": {
++      "item": "minecraft:cobblestone"
++    },
++    "S": {
++      "item": "minecraft:smooth_stone_slab"
++    },
++    "R": {
++      "item": "minecraft:lead"
++    }
++  },
++  "pattern": [
++    " W ",
++    "SRS"
++  ],
++  "result": {
++    "item": "createpropulsion:redstone_helm"
++  },
++  "show_notification": true
++}
+\ No newline at end of file

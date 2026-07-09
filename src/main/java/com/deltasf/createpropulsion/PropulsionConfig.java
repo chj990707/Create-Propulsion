@@ -108,6 +108,10 @@ public class PropulsionConfig {
     //Tilt adapter
     public static final ForgeConfigSpec.ConfigValue<Double> TILT_ADAPTER_ANGLE_RANGE;
 
+    //Helm
+    public static final ForgeConfigSpec.ConfigValue<Integer> HELM_WHEEL_INTERVAL;
+    public static final ForgeConfigSpec.ConfigValue<Integer> HELM_SPRINT_STEPS;
+
     //Atmosphere
     public static final ForgeConfigSpec.ConfigValue<Double> ATMOSPHERE_HEIGHT_FACTOR;
     public static final ForgeConfigSpec.ConfigValue<Double> ATMOSPHERE_NOISE_MAGNITUDE;
@@ -245,6 +249,13 @@ public class PropulsionConfig {
         SERVER_BUILDER.push("Tilt Adapter");
         TILT_ADAPTER_ANGLE_RANGE = SERVER_BUILDER.comment("Angle range of the tilt adapter. Better leave it close to 30.")
                 .defineInRange("Angle range", 30.0, 10.0, 60.0);
+        SERVER_BUILDER.pop();
+
+        SERVER_BUILDER.push("Helm");
+        HELM_WHEEL_INTERVAL = SERVER_BUILDER.comment("Degrees the ship's wheel turns per input step. Lower values give finer signal control (one redstone level per 24 degrees).")
+                .defineInRange("Wheel interval", 6, 1, 90);
+        HELM_SPRINT_STEPS = SERVER_BUILDER.comment("How many wheel steps are performed per tick while the helmsman holds the sprint key.")
+                .defineInRange("Sprint speed multiplier", 3, 1, 10);
         SERVER_BUILDER.pop();
 
         SERVER_BUILDER.push("Atmosphere");

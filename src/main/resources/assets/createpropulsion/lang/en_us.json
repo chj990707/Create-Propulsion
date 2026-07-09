@@ -302,5 +302,7 @@
   "createpropulsion.ponder.shared.multiblock_efficiency.efficiency_1": "§fA §32x2x2 §fthruster is slightly more fuel-efficient than 8 singular thrusters.",
   "createpropulsion.ponder.shared.multiblock_efficiency.efficiency_2": "§fA §33x3x3 §fthruster is is even more fuel-efficient, and also gains oxidizer efficiency.",
 
-  "sounds.createpropulsion.prop_loop": "Propeller spinning"
+  "sounds.createpropulsion.prop_loop": "Propeller spinning",
+  "block.createpropulsion.redstone_helm": "Redstone Ship's Helm",
+  "item.createpropulsion.redstone_helm": "Redstone Ship's Helm"
 }
