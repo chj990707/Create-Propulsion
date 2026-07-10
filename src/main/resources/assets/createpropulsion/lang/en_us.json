@@ -271,5 +271,8 @@
     "createpropulsion.ponder.shared.burner.status.hot": "§fBurner Status: §6Hot",
     "createpropulsion.ponder.shared.burner.status.searing": "§fBurner Status: §cSearing",
 
-    "sounds.createpropulsion.prop_loop": "Propeller spinning"
+    "sounds.createpropulsion.prop_loop": "Propeller spinning",
+
+    "item.createpropulsion.cloudfarer_music_disc": "Music Disc",
+    "item.createpropulsion.cloudfarer_music_disc.desc": "Cloudfarer - h0w t0 d!e"
 }

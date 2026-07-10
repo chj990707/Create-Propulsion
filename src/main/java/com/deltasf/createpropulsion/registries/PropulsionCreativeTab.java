@@ -75,6 +75,8 @@ public class PropulsionCreativeTab {
                 output.accept(PropulsionItems.ANDESITE_BLADE);
 
                 output.accept(PropulsionBlocks.TILT_ADAPTER_BLOCK);
+
+                output.accept(PropulsionItems.CLOUDFARER_MUSIC_DISC);
             }
         }
 }
