@@ -304,5 +304,8 @@
 
   "sounds.createpropulsion.prop_loop": "Propeller spinning",
   "block.createpropulsion.redstone_helm": "Redstone Ship's Helm",
-  "item.createpropulsion.redstone_helm": "Redstone Ship's Helm"
+  "item.createpropulsion.redstone_helm": "Redstone Ship's Helm",
+
+  "item.createpropulsion.cloudfarer_music_disc": "Music Disc",
+  "item.createpropulsion.cloudfarer_music_disc.desc": "Cloudfarer - h0w t0 d!e"
 }
