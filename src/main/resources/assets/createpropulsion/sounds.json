@@ -68,5 +68,15 @@
         "attenuation_distance": 32
       }
     ]
+  },
+  "cloudfarer" : {
+    "category": "record",
+    "subtitle": "sounds.createpropulsion.cloudfarer",
+    "sounds": [
+      {
+        "name": "createpropulsion:cloudfarer",
+        "stream": true
+      }
+    ]
   }
 }

@@ -15,8 +15,11 @@ import com.tterrag.registrate.util.nullness.NonNullBiConsumer;
 
 import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.tags.ItemTags;
 import net.minecraft.tags.TagKey;
 import net.minecraft.world.item.Item;
+import net.minecraft.world.item.Rarity;
+import net.minecraft.world.item.RecordItem;
 
 public class PropulsionItems {
     public static final CreateRegistrate REGISTRATE = CreatePropulsion.registrate();
@@ -89,6 +92,11 @@ public class PropulsionItems {
         .setData(ProviderType.LANG, FUCK_OFF_LANG())
         .properties(p -> p.stacksTo(1))
         .register();
+
+    public static final ItemEntry<RecordItem> CLOUDFARER_MUSIC_DISC = REGISTRATE.item("cloudfarer_music_disc",
+            p -> new RecordItem(8, PropulsionSoundEvents.CLOUDFARER_MUSIC, p.rarity(Rarity.EPIC).stacksTo(1), 3120))
+            .register();
+
 
     public static TagKey<Item> makeTag(String key) {
         ResourceLocation resource = ResourceLocation.fromNamespaceAndPath(CreatePropulsion.ID, key);

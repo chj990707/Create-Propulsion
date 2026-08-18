@@ -18,6 +18,8 @@ public class PropulsionSoundEvents {
     public static RegistryObject<SoundEvent> PROPELLER_80;
     public static RegistryObject<SoundEvent>[] PROP_SOUNDS;
 
+    public static RegistryObject<SoundEvent> CLOUDFARER_MUSIC;
+
     public static RegistryObject<SoundEvent> THRUSTER;
 
     private static RegistryObject<SoundEvent> registerSoundEvent(String name) {
@@ -34,6 +36,7 @@ public class PropulsionSoundEvents {
         PROPELLER_80 = registerSoundEvent("prop_6");
         PROP_SOUNDS = new RegistryObject[]{PROPELLER_2_5, PROPELLER_5, PROPELLER_10, PROPELLER_20, PROPELLER_40, PROPELLER_80};
         THRUSTER = registerSoundEvent("thruster_loop");
+        CLOUDFARER_MUSIC = registerSoundEvent("cloudfarer");
     }
 
     public static void register(IEventBus eventBus) {

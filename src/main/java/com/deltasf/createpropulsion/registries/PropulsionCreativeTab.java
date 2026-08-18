@@ -73,9 +73,11 @@ public class PropulsionCreativeTab {
             output.accept(PropulsionItems.WOODEN_BLADE);
             output.accept(PropulsionItems.COPPER_BLADE);
             output.accept(PropulsionItems.ANDESITE_BLADE);
-
             output.accept(PropulsionBlocks.TILT_ADAPTER_BLOCK);
             output.accept(PropulsionBlocks.REDSTONE_HELM_BLOCK);
+            output.accept(PropulsionBlocks.TILT_ADAPTER_BLOCK);
+            output.accept(PropulsionItems.CLOUDFARER_MUSIC_DISC);
+            }
         }
     }
 }
