@@ -356,6 +356,7 @@ public class LodestoneTrackerBlockEntity extends SmartBlockEntity {
         } else {
             itemHandler.deserializeNBT(tag.getCompound("inventory"));
             this.compassFacing = Direction.byName(tag.getString("compassFacing"));
+            if (this.compassFacing == null) this.compassFacing = Direction.NORTH;
         }
 
         currentTick = tag.getInt("currentTick");
