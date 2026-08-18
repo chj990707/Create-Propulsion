@@ -1,20 +1,13 @@
 package com.deltasf.createpropulsion.registries;
 
-import java.util.function.Consumer;
-import java.util.function.Supplier;
-
-import net.createmod.catnip.theme.Color;
-import org.jetbrains.annotations.NotNull;
-import org.joml.Vector3f;
-
 import com.mojang.blaze3d.shaders.FogShape;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.tterrag.registrate.builders.FluidBuilder.FluidTypeFactory;
-
+import net.createmod.catnip.theme.Color;
 import net.minecraft.client.Camera;
 import net.minecraft.client.multiplayer.ClientLevel;
-import net.minecraft.client.renderer.RenderType;
 import net.minecraft.client.renderer.FogRenderer.FogMode;
+import net.minecraft.client.renderer.RenderType;
 import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.level.BlockAndTintGetter;
@@ -22,14 +15,28 @@ import net.minecraft.world.level.material.FluidState;
 import net.minecraftforge.client.extensions.common.IClientFluidTypeExtensions;
 import net.minecraftforge.fluids.FluidStack;
 import net.minecraftforge.fluids.FluidType;
+import org.jetbrains.annotations.NotNull;
+import org.joml.Vector3f;
+
+import java.util.function.Consumer;
+import java.util.function.Supplier;
 
 public class PropulsionFluidsClient {
-    
+
     public static Supplier<FluidTypeFactory> getTurpentineTypeFactory() {
         return () -> SolidRenderedPlaceableFluidType.create(0xd69e49, () -> 1.0f / 4.0f, 0xffd69e49);
     }
 
     public static Supplier<RenderType> getTurpentineRenderType() {
+        return () -> RenderType.translucent();
+    }
+
+    public static Supplier<FluidTypeFactory> getOxidizerTypeFactory() {
+        //Pale icy blue. Fog is slightly more saturated than the tint so submersion reads clearly.
+        return () -> SolidRenderedPlaceableFluidType.create(0x8fc8e0, () -> 1.0f / 3.0f, 0xffa8d8e8);
+    }
+
+    public static Supplier<RenderType> getOxidizerRenderType() {
         return () -> RenderType.translucent();
     }
 

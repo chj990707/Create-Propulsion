@@ -1,0 +1,6 @@
+{
+	"parent": "createpropulsion:block/redstone_helm_block_base",
+	"textures": {
+		"2": "createpropulsion:block/redstone_helm_block_right"
+	}
+}

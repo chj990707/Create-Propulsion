@@ -16,6 +16,7 @@ import net.createmod.catnip.lang.LangBuilder;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
+import net.minecraft.client.sounds.SoundManager;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.particles.ParticleOptions;
@@ -43,7 +44,7 @@ public abstract class AbstractThrusterBlockEntity extends SmartBlockEntity imple
     protected static final int TICKS_PER_ENTITY_CHECK = 5;
     private static final float PARTICLE_VELOCITY = 4;
     private static final double SHIP_VELOCITY_INHERITANCE = 0.5;
-    
+
     protected static final float LOWEST_POWER_THRESHOLD = 5.0f / 15.0f;
 
     //Common State
@@ -81,12 +82,12 @@ public abstract class AbstractThrusterBlockEntity extends SmartBlockEntity imple
         if (!level.isClientSide) {
             BlockState state = getBlockState();
             calculateObstruction(level, worldPosition, state.getValue(AbstractThrusterBlock.FACING));
-            
+
             ThrusterForceAttachment ship = ThrusterForceAttachment.get(level, worldPosition);
             if (ship != null) {
                 ThrusterData data = this.getThrusterData();
                 data.setDirection(VectorConversionsMCKt.toJOMLD(state.getValue(AbstractThrusterBlock.FACING).getNormal()));
-                data.setThrust(0); 
+                data.setThrust(0);
                 ThrusterForceApplier applier = new ThrusterForceApplier(data);
                 ship.addApplier(worldPosition, applier);
             }
@@ -95,10 +96,10 @@ public abstract class AbstractThrusterBlockEntity extends SmartBlockEntity imple
             if (block instanceof AbstractThrusterBlock) {
                 ((AbstractThrusterBlock) block).doRedstoneCheck(level, getBlockState(), worldPosition);
             }
-        } else {
-            soundInstance = new ThrusterSoundInstance(this);
-            Minecraft.getInstance().getSoundManager().queueTickingSound(soundInstance);
         }
+        // Client-side sound instances are created lazily from tick() via
+        // ensureSoundInstance() rather than here, so they can stop themselves
+        // (releasing their sound channel) while idle and be revived later.
     }
 
     //Control logic
@@ -157,7 +158,7 @@ public abstract class AbstractThrusterBlockEntity extends SmartBlockEntity imple
         if (this.isRemoved()) {
             return;
         }
-        //This part should ACTUALLY fix the issue with particle emission 
+        //This part should ACTUALLY fix the issue with particle emission
         if (level.getBlockState(worldPosition).getBlock() != this.getBlockState().getBlock()) {
             this.setRemoved();
             return;
@@ -166,6 +167,7 @@ public abstract class AbstractThrusterBlockEntity extends SmartBlockEntity imple
         super.tick();
         BlockState currentBlockState = getBlockState();
         if (level.isClientSide) {
+            ensureSoundInstance();
             if (shouldEmitParticles()) {
                 emitParticles(level, worldPosition, currentBlockState);
             }
@@ -213,6 +215,14 @@ public abstract class AbstractThrusterBlockEntity extends SmartBlockEntity imple
         return isPowered() && isWorking();
     }
 
+    /** The audio counterpart of shouldEmitParticles(): a thruster only hums
+     *  while it is actually producing thrust -- powered AND working (valid
+     *  fuel, and oxidizer for multiblocks). Read by ThrusterSoundInstance
+     *  every tick and by ensureSoundInstance() as the revival gate. */
+    protected boolean shouldPlaySound() {
+        return isPowered() && isWorking();
+    }
+
     protected boolean shouldDamageEntities() {
         return PropulsionConfig.THRUSTER_DAMAGE_ENTITIES.get() && isPowered() && isWorking();
     }
@@ -231,32 +241,45 @@ public abstract class AbstractThrusterBlockEntity extends SmartBlockEntity imple
         return new PlumeParticleData((ParticleType<PlumeParticleData>) ParticleTypes.getPlumeType());
     }
 
+    /** Optional extra offset applied to the particle spawn position, in
+     *  block-space. Default: zero. Subclasses can override to shift where
+     *  plumes originate without affecting their velocity or ejection
+     *  direction. Used by multiblock thrusters to draw per-cell plumes a
+     *  few pixels toward the cube's axis.
+     *
+     *  @param oppositeDirection the exhaust direction (FACING.getOpposite()),
+     *                           passed so overrides can reason about which
+     *                           axes are perpendicular to the nozzle. */
+    protected Vector3d getExtraParticleOriginOffset(Direction oppositeDirection) {
+        return new Vector3d();
+    }
+
     protected abstract double getNozzleOffsetFromCenter();
 
     public void emitParticles(Level level, BlockPos pos, BlockState state) {
         if (emptyBlocks == 0) return;
         float power = getPower();
-    
+
         double particleCountMultiplier = org.joml.Math.clamp(0.0, 2.0, PropulsionConfig.THRUSTER_PARTICLE_COUNT_MULTIPLIER.get());
         if (particleCountMultiplier <= 0) return;
-    
+
         clientTick++;
         if (power < LOWEST_POWER_THRESHOLD && clientTick % 2 == 0) {
             clientTick = 0;
             return;
         }
-    
+
         this.particleSpawnAccumulator += particleCountMultiplier;
-    
+
         int particlesToSpawn = (int) this.particleSpawnAccumulator;
         if (particlesToSpawn == 0) return;
-    
+
         float visualPower = Math.max(power, LOWEST_POWER_THRESHOLD);
 
         this.particleSpawnAccumulator -= particlesToSpawn;
         Direction direction = state.getValue(AbstractThrusterBlock.FACING);
         Direction oppositeDirection = direction.getOpposite();
-    
+
         double currentNozzleOffset = getNozzleOffsetFromCenter();
         Vector3d additionalVel = new Vector3d();
         ClientShip ship = VSGameUtilsKt.getShipObjectManagingPos((ClientLevel) level, pos);
@@ -264,11 +287,11 @@ public abstract class AbstractThrusterBlockEntity extends SmartBlockEntity imple
             Vector3dc shipWorldVelocityJOML = ship.getVelocity();
             Matrix4dc transform = ship.getRenderTransform().getShipToWorld();
             Matrix4dc invTransform = ship.getRenderTransform().getWorldToShip();
-    
+
             Vector3d shipVelocity = invTransform.transformDirection(new Vector3d(shipWorldVelocityJOML));
-    
+
             Vector3d particleEjectionUnitVecJOML = transform.transformDirection(VectorConversionsMCKt.toJOMLD(oppositeDirection.getNormal()));
-    
+
             double shipVelComponentAlongRotatedEjection = shipWorldVelocityJOML.dot(particleEjectionUnitVecJOML);
             if (shipVelComponentAlongRotatedEjection > 0.0) {
                 Vector3d normalizedVelocity = new Vector3d();
@@ -281,21 +304,27 @@ public abstract class AbstractThrusterBlockEntity extends SmartBlockEntity imple
                 additionalVel = new Vector3d(shipVelocity).mul(SHIP_VELOCITY_INHERITANCE * effect);
             }
         }
-    
-        double particleX = pos.getX() + 0.5 + oppositeDirection.getStepX() * currentNozzleOffset;
-        double particleY = pos.getY() + 0.5 + oppositeDirection.getStepY() * currentNozzleOffset;
-        double particleZ = pos.getZ() + 0.5 + oppositeDirection.getStepZ() * currentNozzleOffset;
-    
+
+        // Optional perpendicular nudge supplied by subclasses (used by
+        // multiblock thrusters to pull per-cell plumes a little toward the
+        // cube's axis for a cleaner silhouette). Singles override nothing
+        // and get (0, 0, 0) here, preserving exact pre-existing positions.
+        Vector3d extraOriginOffset = getExtraParticleOriginOffset(oppositeDirection);
+
+        double particleX = pos.getX() + 0.5 + oppositeDirection.getStepX() * currentNozzleOffset + extraOriginOffset.x;
+        double particleY = pos.getY() + 0.5 + oppositeDirection.getStepY() * currentNozzleOffset + extraOriginOffset.y;
+        double particleZ = pos.getZ() + 0.5 + oppositeDirection.getStepZ() * currentNozzleOffset + extraOriginOffset.z;
+
         Vector3d particleVelocity = new Vector3d(oppositeDirection.getStepX(), oppositeDirection.getStepY(), oppositeDirection.getStepZ())
-            .mul(PARTICLE_VELOCITY * visualPower).add(additionalVel);
-    
+                .mul(PARTICLE_VELOCITY * visualPower).add(additionalVel);
+
         ParticleOptions particleData = createParticleOptions();
 
         //Spawn the calculated number of particles.
         for (int i = 0; i < particlesToSpawn; i++) {
             level.addParticle(particleData, true,
-                particleX, particleY, particleZ,
-                particleVelocity.x, particleVelocity.y, particleVelocity.z);
+                    particleX, particleY, particleZ,
+                    particleVelocity.x, particleVelocity.y, particleVelocity.z);
         }
     }
 
@@ -331,12 +360,20 @@ public abstract class AbstractThrusterBlockEntity extends SmartBlockEntity imple
     }
 
     protected void addThrusterDetails(List<Component> tooltip, boolean isPlayerSneaking) {
+        // Use getEmptyBlocks() (not the raw field) so multiblock subclasses
+        // can supply an aggregate value across the whole cube. Singles
+        // return their local field unchanged; multi controllers return the
+        // averaged nozzle-face-cell count (see
+        // ThrusterBlockEntity#getEmptyBlocks). This fixes rear/interior
+        // multiblock cells reporting stale "obstructed" readings on the
+        // goggle tooltip.
+        int empty = getEmptyBlocks();
         float efficiency = 100;
         ChatFormatting tooltipColor = ChatFormatting.GREEN;
-        if (emptyBlocks < OBSTRUCTION_LENGTH) {
+        if (empty < OBSTRUCTION_LENGTH) {
             efficiency = calculateObstructionEffect() * 100;
             tooltipColor = GoggleUtils.efficiencyColor(efficiency);
-            CreateLang.builder().add(Component.translatable("createpropulsion.gui.goggles.thruster.obstructed")).space().add(CreateLang.text(GoggleUtils.makeObstructionBar(emptyBlocks, OBSTRUCTION_LENGTH))).style(tooltipColor).forGoggles(tooltip);
+            CreateLang.builder().add(Component.translatable("createpropulsion.gui.goggles.thruster.obstructed")).space().add(CreateLang.text(GoggleUtils.makeObstructionBar(empty, OBSTRUCTION_LENGTH))).style(tooltipColor).forGoggles(tooltip);
         }
 
         CreateLang.builder().add(Component.translatable("createpropulsion.gui.goggles.thruster.efficiency")).text(": ").add(CreateLang.number(efficiency)).add(CreateLang.text("%")).style(tooltipColor).forGoggles(tooltip);
@@ -348,7 +385,7 @@ public abstract class AbstractThrusterBlockEntity extends SmartBlockEntity imple
         super.write(compound, clientPacket);
         compound.putInt("emptyBlocks", emptyBlocks);
         compound.putInt("currentTick", currentTick);
-        
+
         compound.putInt("RedstoneInput", redstoneInput);
         compound.putFloat("DigitalInput", digitalInput);
         compound.putInt("ControlMode", controlMode.ordinal());
@@ -365,6 +402,44 @@ public abstract class AbstractThrusterBlockEntity extends SmartBlockEntity imple
         if (compound.contains("ControlMode")) {
             controlMode = ControlMode.values()[compound.getInt("ControlMode")];
         }
+    }
+
+    // Cooldown between sound revival attempts. A freshly queued instance
+    // sits in the engine's queue for a tick before isActive() reports it,
+    // so retrying every tick would stack duplicate sounds.
+    private int soundRetryCooldown = 0;
+
+    /** Client-side: (re)creates the looping sound instance if this thruster
+     *  should currently emit one and none is LIVE IN THE ENGINE. Liveness
+     *  must be checked against the engine itself (isActive), not just the
+     *  instance's own isStopped flag: the engine drops sounds externally on
+     *  volume slider changes, F3+T, resource reloads, and device changes
+     *  without ever setting that flag. Idle thrusters are not revived at
+     *  all -- between this gate and the instance's own idle-stop, a
+     *  thruster at zero power costs zero of Minecraft's 247 sound
+     *  channels. */
+    public void ensureSoundInstance() {
+        if (level == null || !level.isClientSide) return;
+        if (!shouldEmitSound() || !shouldPlaySound()) return;
+        SoundManager soundManager = Minecraft.getInstance().getSoundManager();
+        if (soundInstance != null && !soundInstance.isStopped() && soundManager.isActive(soundInstance)) {
+            soundRetryCooldown = 0;
+            return;
+        }
+        if (soundRetryCooldown > 0) {
+            soundRetryCooldown--;
+            return;
+        }
+        soundRetryCooldown = 4;
+        soundInstance = new ThrusterSoundInstance(this);
+        soundManager.queueTickingSound(soundInstance);
+    }
+
+    /** Whether this block entity should host a sound instance at all.
+     *  Multiblock-capable thrusters override this to exclude non-controller
+     *  cells, so a 3x3x3 cube costs one sound channel instead of 27. */
+    public boolean shouldEmitSound() {
+        return true;
     }
 
     @Override

@@ -1,19 +1,17 @@
 package com.deltasf.createpropulsion.ponder;
 
-import java.util.ArrayList;
-import java.util.List;
-
-import javax.annotation.Nonnull;
-
 import com.deltasf.createpropulsion.CreatePropulsion;
 import com.deltasf.createpropulsion.registries.PropulsionBlocks;
 import com.deltasf.createpropulsion.registries.PropulsionBlocks.EnvelopeColor;
 import com.tterrag.registrate.util.entry.ItemProviderEntry;
 import com.tterrag.registrate.util.entry.RegistryEntry;
-
 import net.createmod.ponder.api.registration.PonderPlugin;
 import net.createmod.ponder.api.registration.PonderSceneRegistrationHelper;
 import net.minecraft.resources.ResourceLocation;
+
+import javax.annotation.Nonnull;
+import java.util.ArrayList;
+import java.util.List;
 
 public class DeltaPonderPlugin implements PonderPlugin {
     //TODO: Stirling engine ponder
@@ -38,6 +36,12 @@ public class DeltaPonderPlugin implements PonderPlugin {
         HELPER.forComponents(envelopePonderables).addStoryBoard("balloon", EnvelopeScenes::makingBalloon);
         //Injectors
         HELPER.forComponents(PropulsionBlocks.HOT_AIR_PUMP_BLOCK).addStoryBoard("hot_air_pump", InjectorScenes::hotAirPump);
+
+        HELPER.forComponents(PropulsionBlocks.THRUSTER_BLOCK)
+                .addStoryBoard("single_thruster", ThrusterScenes::single)
+                .addStoryBoard("multiblock_thruster_2x2x2", ThrusterScenes::multiblock)
+                .addStoryBoard("multiblock_efficiency", ThrusterScenes::multiblock_efficiency);
+
     }
 
     @Override

@@ -1,0 +1,36 @@
+{
+  "type": "forge:conditional",
+  "recipes": [
+    {
+      "conditions": [
+        {
+          "type": "forge:not",
+          "value": {
+            "type": "forge:tag_empty",
+            "tag": "forge:dusts/iron"
+          }
+        }
+      ],
+      "recipe": {
+        "type": "create:mixing",
+        "heatRequirement": "heated",
+        "ingredients": [
+          {
+            "fluid": "create:potion",
+            "nbt": { "Potion": "minecraft:awkward" },
+            "amount": 1000
+          },
+          {
+            "tag": "forge:dusts/iron"
+          }
+        ],
+        "results": [
+          {
+            "fluid": "createpropulsion:oxidizer",
+            "amount": 1000
+          }
+        ]
+      }
+    }
+  ]
+}

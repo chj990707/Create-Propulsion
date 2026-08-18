@@ -1,9 +1,5 @@
 package com.deltasf.createpropulsion.compat.computercraft;
 
-import java.util.HashMap;
-import java.util.Map;
-import java.util.function.Function;
-
 import com.deltasf.createpropulsion.balloons.injectors.hot_air_pump.HotAirPumpBlockEntity;
 import com.deltasf.createpropulsion.heat.engine.StirlingEngineBlockEntity;
 import com.deltasf.createpropulsion.lodestone_tracker.LodestoneTrackerBlockEntity;
@@ -12,11 +8,11 @@ import com.deltasf.createpropulsion.optical_sensors.OpticalSensorBlockEntity;
 import com.deltasf.createpropulsion.physics_assembler.PhysicsAssemblerBlockEntity;
 import com.deltasf.createpropulsion.redstone_transmission.RedstoneTransmissionBlockEntity;
 import com.deltasf.createpropulsion.thruster.creative_thruster.CreativeThrusterBlockEntity;
+import com.deltasf.createpropulsion.thruster.ion.IonThrusterBlockEntity;
 import com.deltasf.createpropulsion.thruster.thruster.ThrusterBlockEntity;
 import com.deltasf.createpropulsion.tilt_adapter.TiltAdapterBlockEntity;
 import com.simibubi.create.compat.computercraft.AbstractComputerBehaviour;
 import com.simibubi.create.foundation.blockEntity.SmartBlockEntity;
-
 import dan200.computercraft.api.peripheral.IPeripheral;
 import net.minecraftforge.common.capabilities.Capability;
 import net.minecraftforge.common.capabilities.CapabilityManager;
@@ -25,9 +21,13 @@ import net.minecraftforge.common.util.LazyOptional;
 import net.minecraftforge.common.util.NonNullSupplier;
 import net.minecraftforge.registries.ForgeRegistries;
 
+import java.util.HashMap;
+import java.util.Map;
+import java.util.function.Function;
+
 public class ComputerBehaviour extends AbstractComputerBehaviour {
     protected static final Capability<IPeripheral> PERIPHERAL_CAPABILITY =
-        CapabilityManager.get(new CapabilityToken<>() {});
+            CapabilityManager.get(new CapabilityToken<>() {});
 
     protected LazyOptional<IPeripheral> peripheral;
     protected NonNullSupplier<IPeripheral> peripheralSupplier;
@@ -42,6 +42,7 @@ public class ComputerBehaviour extends AbstractComputerBehaviour {
     static {
         register(ThrusterBlockEntity.class, ThrusterPeripheral::new);
         register(CreativeThrusterBlockEntity.class, CreativeThrusterPeripheral::new);
+        register(IonThrusterBlockEntity.class, IonThrusterPeripheral::new);
         register(OpticalSensorBlockEntity.class, OpticalSensorPeripheral::new);
         register(LodestoneTrackerBlockEntity.class, LodestoneTrackerPeripheral::new);
         register(RedstoneMagnetBlockEntity.class, RedstoneMagnetPeripheral::new);

@@ -1,0 +1,23 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "redstone",
+  "key": {
+    "W": {
+      "item": "minecraft:cobblestone"
+    },
+    "S": {
+      "item": "minecraft:smooth_stone_slab"
+    },
+    "R": {
+      "item": "minecraft:lead"
+    }
+  },
+  "pattern": [
+    " W ",
+    "SRS"
+  ],
+  "result": {
+    "item": "createpropulsion:redstone_helm"
+  },
+  "show_notification": true
+}

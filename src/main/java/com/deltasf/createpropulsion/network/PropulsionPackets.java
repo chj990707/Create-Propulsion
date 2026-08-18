@@ -5,6 +5,8 @@ import com.deltasf.createpropulsion.balloons.network.BalloonDeltaPacket;
 import com.deltasf.createpropulsion.balloons.network.BalloonDestroyPacket;
 import com.deltasf.createpropulsion.balloons.network.BalloonStructureSyncPacket;
 import com.deltasf.createpropulsion.balloons.network.BalloonUpdatePacket;
+import com.deltasf.createpropulsion.helm.HelmSprintPacket;
+import com.deltasf.createpropulsion.helm.SyncHelmWheelPacket;
 import com.deltasf.createpropulsion.physics_assembler.packets.AssemblyFailedPacket;
 import com.deltasf.createpropulsion.physics_assembler.packets.GaugeInsertionErrorPacket;
 import com.deltasf.createpropulsion.physics_assembler.packets.GaugeUsedPacket;
@@ -92,6 +94,18 @@ public class PropulsionPackets {
                 .encoder(SyncBladePropertiesPacket::encode)
                 .decoder(SyncBladePropertiesPacket::decode)
                 .consumerMainThread(SyncBladePropertiesPacket::handle)
+                .add();
+
+        INSTANCE.messageBuilder(SyncHelmWheelPacket.class, id(), NetworkDirection.PLAY_TO_CLIENT)
+                .encoder(SyncHelmWheelPacket::encode)
+                .decoder(SyncHelmWheelPacket::new)
+                .consumerMainThread(SyncHelmWheelPacket::handle)
+                .add();
+
+        INSTANCE.messageBuilder(HelmSprintPacket.class, id(), NetworkDirection.PLAY_TO_SERVER)
+                .encoder(HelmSprintPacket::encode)
+                .decoder(HelmSprintPacket::new)
+                .consumerMainThread(HelmSprintPacket::handle)
                 .add();
     }
 

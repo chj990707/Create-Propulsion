@@ -1,7 +1,5 @@
 package com.deltasf.createpropulsion.particles.plasma;
 
-import javax.annotation.Nonnull;
-
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.particle.Particle;
 import net.minecraft.client.particle.ParticleProvider;
@@ -10,6 +8,8 @@ import net.minecraft.client.particle.SimpleAnimatedParticle;
 import net.minecraft.client.particle.SpriteSet;
 import net.minecraft.util.Mth;
 import net.minecraft.world.phys.Vec3;
+
+import javax.annotation.Nonnull;
 
 public class PlasmaParticle extends SimpleAnimatedParticle {
     
@@ -27,7 +27,7 @@ public class PlasmaParticle extends SimpleAnimatedParticle {
 
     //Visuals
     private final SpriteSet spriteSet;
-    private static final int PLASMA_SPRITE_COUNT = 9;
+    private static final int PLASMA_SPRITE_COUNT = 10;
 
     private static final float PLASMA_SHRINK_START = 0.6f;
     private static final float PLASMA_END_SCALE_MULTIPLIER = 3.0f;

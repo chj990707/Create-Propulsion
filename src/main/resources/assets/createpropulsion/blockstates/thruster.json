@@ -1,10 +1,17 @@
 {
   "variants": {
-    "facing=north": { "model": "createpropulsion:block/thruster" },
-    "facing=south": { "model": "createpropulsion:block/thruster", "y": 180 },
-    "facing=west":  { "model": "createpropulsion:block/thruster", "y": 270 },
-    "facing=east":  { "model": "createpropulsion:block/thruster", "y": 90 },
-    "facing=up":    { "model": "createpropulsion:block/thruster", "x": 270 },
-    "facing=down":  { "model": "createpropulsion:block/thruster", "x": 90 }
+    "facing=north,multi=false": { "model": "createpropulsion:block/thruster" },
+    "facing=south,multi=false": { "model": "createpropulsion:block/thruster", "y": 180 },
+    "facing=west,multi=false":  { "model": "createpropulsion:block/thruster", "y": 270 },
+    "facing=east,multi=false":  { "model": "createpropulsion:block/thruster", "y": 90 },
+    "facing=up,multi=false":    { "model": "createpropulsion:block/thruster", "x": 270 },
+    "facing=down,multi=false":  { "model": "createpropulsion:block/thruster", "x": 90 },
+
+    "facing=north,multi=true":  { "model": "createpropulsion:block/thruster_empty" },
+    "facing=south,multi=true":  { "model": "createpropulsion:block/thruster_empty" },
+    "facing=west,multi=true":   { "model": "createpropulsion:block/thruster_empty" },
+    "facing=east,multi=true":   { "model": "createpropulsion:block/thruster_empty" },
+    "facing=up,multi=true":     { "model": "createpropulsion:block/thruster_empty" },
+    "facing=down,multi=true":   { "model": "createpropulsion:block/thruster_empty" }
   }
 }

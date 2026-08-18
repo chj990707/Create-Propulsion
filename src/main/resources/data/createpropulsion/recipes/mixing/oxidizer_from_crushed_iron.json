@@ -1,0 +1,22 @@
+{
+  "type": "create:mixing",
+  "heatRequirement": "superheated",
+  "ingredients": [
+    {
+      "tag": "forge:crops/nether_wart"
+    },
+    {
+      "item": "create:crushed_raw_iron"
+    },
+    {
+      "amount": 1000,
+      "fluid": "minecraft:water"
+    }
+  ],
+  "results": [
+    {
+      "amount": 1000,
+      "fluid": "createpropulsion:oxidizer"
+    }
+  ]
+}

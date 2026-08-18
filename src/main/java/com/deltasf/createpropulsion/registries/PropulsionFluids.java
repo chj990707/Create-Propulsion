@@ -1,7 +1,5 @@
 package com.deltasf.createpropulsion.registries;
 
-import java.util.function.Supplier;
-
 import com.deltasf.createpropulsion.CreatePropulsion;
 import com.simibubi.create.foundation.data.CreateRegistrate;
 import com.tterrag.registrate.builders.FluidBuilder.FluidTypeFactory;
@@ -10,12 +8,13 @@ import com.tterrag.registrate.providers.ProviderType;
 import com.tterrag.registrate.providers.RegistrateLangProvider;
 import com.tterrag.registrate.util.entry.FluidEntry;
 import com.tterrag.registrate.util.nullness.NonNullBiConsumer;
-
 import net.minecraft.client.renderer.RenderType;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraftforge.fluids.FluidType;
 import net.minecraftforge.fluids.ForgeFlowingFluid;
 import net.minecraftforge.fml.DistExecutor;
+
+import java.util.function.Supplier;
 
 public class PropulsionFluids {
     public static final CreateRegistrate REGISTRATE = CreatePropulsion.registrate();
@@ -26,35 +25,65 @@ public class PropulsionFluids {
     }
 
     private static final Supplier<FluidTypeFactory> TURPENTINE_TYPE_FACTORY = DistExecutor.unsafeRunForDist(
-        () -> PropulsionFluidsClient::getTurpentineTypeFactory,
-        () -> PropulsionFluids::createGenericFactory
+            () -> PropulsionFluidsClient::getTurpentineTypeFactory,
+            () -> PropulsionFluids::createGenericFactory
     );
 
-    public static final FluidEntry<ForgeFlowingFluid.Flowing> TURPENTINE = REGISTRATE.fluid("turpentine", 
-            ResourceLocation.fromNamespaceAndPath("minecraft", "block/water_still"), 
-            ResourceLocation.fromNamespaceAndPath("minecraft", "block/water_flow"),
-            TURPENTINE_TYPE_FACTORY.get())
-        .renderType(getSidedRenderType())
-        .source(ForgeFlowingFluid.Source::new) 
-        .setData(ProviderType.LANG, FUCK_OFF_LANG())
-        .block().setData(ProviderType.LANG, FUCK_OFF_LANG()).build()
-        .bucket().setData(ProviderType.LANG, FUCK_OFF_LANG()).build()
-        .properties(p -> p.viscosity(1000).density(500))
-        .fluidProperties(p -> p.levelDecreasePerBlock(1)
-            .tickRate(7)
-            .slopeFindDistance(3)
-            .explosionResistance(100f))
-        .register();
+    private static final Supplier<FluidTypeFactory> OXIDIZER_TYPE_FACTORY = DistExecutor.unsafeRunForDist(
+            () -> PropulsionFluidsClient::getOxidizerTypeFactory,
+            () -> PropulsionFluids::createGenericFactory
+    );
+
+    public static final FluidEntry<ForgeFlowingFluid.Flowing> TURPENTINE = REGISTRATE.fluid("turpentine",
+                    ResourceLocation.fromNamespaceAndPath("minecraft", "block/water_still"),
+                    ResourceLocation.fromNamespaceAndPath("minecraft", "block/water_flow"),
+                    TURPENTINE_TYPE_FACTORY.get())
+            .renderType(getSidedRenderType())
+            .source(ForgeFlowingFluid.Source::new)
+            .setData(ProviderType.LANG, FUCK_OFF_LANG())
+            .block().setData(ProviderType.LANG, FUCK_OFF_LANG()).build()
+            .bucket().setData(ProviderType.LANG, FUCK_OFF_LANG()).build()
+            .properties(p -> p.viscosity(1000).density(500))
+            .fluidProperties(p -> p.levelDecreasePerBlock(1)
+                    .tickRate(7)
+                    .slopeFindDistance(3)
+                    .explosionResistance(100f))
+            .register();
+
+    //Oxidizer: consumed alongside fuel by Multiblock Thrusters.
+    //Cryogenic-ish fluid, lighter than water, cold-blue tint.
+    public static final FluidEntry<ForgeFlowingFluid.Flowing> OXIDIZER = REGISTRATE.fluid("oxidizer",
+                    ResourceLocation.fromNamespaceAndPath("minecraft", "block/water_still"),
+                    ResourceLocation.fromNamespaceAndPath("minecraft", "block/water_flow"),
+                    OXIDIZER_TYPE_FACTORY.get())
+            .renderType(getOxidizerSidedRenderType())
+            .source(ForgeFlowingFluid.Source::new)
+            .setData(ProviderType.LANG, FUCK_OFF_LANG())
+            .block().setData(ProviderType.LANG, FUCK_OFF_LANG()).build()
+            .bucket().setData(ProviderType.LANG, FUCK_OFF_LANG()).build()
+            .properties(p -> p.viscosity(500).density(700))
+            .fluidProperties(p -> p.levelDecreasePerBlock(1)
+                    .tickRate(5)
+                    .slopeFindDistance(3)
+                    .explosionResistance(100f))
+            .register();
 
     //Helpers
-    
+
     private static Supplier<RenderType> getSidedRenderType() {
         return DistExecutor.unsafeRunForDist(
-            () -> PropulsionFluidsClient::getTurpentineRenderType,
-            () -> () -> null
+                () -> PropulsionFluidsClient::getTurpentineRenderType,
+                () -> () -> null
         );
     }
-    
+
+    private static Supplier<RenderType> getOxidizerSidedRenderType() {
+        return DistExecutor.unsafeRunForDist(
+                () -> PropulsionFluidsClient::getOxidizerRenderType,
+                () -> () -> null
+        );
+    }
+
     private static Supplier<FluidTypeFactory> createGenericFactory() {
         return () -> (properties, stillTexture, flowingTexture) -> new FluidType(properties);
     }

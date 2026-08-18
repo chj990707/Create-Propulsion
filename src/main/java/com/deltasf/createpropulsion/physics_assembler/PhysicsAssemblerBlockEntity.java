@@ -1,25 +1,14 @@
 package com.deltasf.createpropulsion.physics_assembler;
 
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Optional;
-import java.util.Set;
-
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
-
-import org.joml.Quaterniond;
-import org.joml.Quaterniondc;
-import org.joml.Vector2i;
-import org.joml.Vector3d;
-import org.joml.Vector3dc;
-import org.joml.Vector3i;
-import org.valkyrienskies.core.api.bodies.properties.BodyKinematics;
-import org.valkyrienskies.core.api.ships.ServerShip;
-import org.valkyrienskies.core.api.ships.properties.ChunkClaim;
-import org.valkyrienskies.core.impl.game.ships.ShipDataCommon;
-
+import com.deltasf.createpropulsion.PropulsionConfig;
+import com.deltasf.createpropulsion.compat.PropulsionCompatibility;
+import com.deltasf.createpropulsion.compat.computercraft.ComputerBehaviour;
+import com.deltasf.createpropulsion.network.PropulsionPackets;
+import com.deltasf.createpropulsion.physics_assembler.packets.AssemblyFailedPacket;
+import com.deltasf.createpropulsion.thruster.thruster.ThrusterBlockEntity;
+import com.simibubi.create.compat.computercraft.AbstractComputerBehaviour;
+import com.simibubi.create.foundation.blockEntity.SmartBlockEntity;
+import com.simibubi.create.foundation.blockEntity.behaviour.BlockEntityBehaviour;
 import net.createmod.catnip.math.VecHelper;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -46,7 +35,16 @@ import net.minecraftforge.common.capabilities.ForgeCapabilities;
 import net.minecraftforge.common.util.LazyOptional;
 import net.minecraftforge.items.IItemHandler;
 import net.minecraftforge.items.ItemStackHandler;
-
+import org.joml.Quaterniond;
+import org.joml.Quaterniondc;
+import org.joml.Vector2i;
+import org.joml.Vector3d;
+import org.joml.Vector3dc;
+import org.joml.Vector3i;
+import org.valkyrienskies.core.api.bodies.properties.BodyKinematics;
+import org.valkyrienskies.core.api.ships.ServerShip;
+import org.valkyrienskies.core.api.ships.properties.ChunkClaim;
+import org.valkyrienskies.core.impl.game.ships.ShipDataCommon;
 import org.valkyrienskies.mod.api.ValkyrienSkies;
 import org.valkyrienskies.mod.common.VSGameUtilsKt;
 import org.valkyrienskies.mod.common.ValkyrienSkiesMod;
@@ -54,14 +52,13 @@ import org.valkyrienskies.mod.common.networking.PacketRestartChunkUpdates;
 import org.valkyrienskies.mod.common.networking.PacketStopChunkUpdates;
 import org.valkyrienskies.mod.common.util.VectorConversionsMCKt;
 
-import com.deltasf.createpropulsion.PropulsionConfig;
-import com.deltasf.createpropulsion.compat.PropulsionCompatibility;
-import com.deltasf.createpropulsion.compat.computercraft.ComputerBehaviour;
-import com.deltasf.createpropulsion.network.PropulsionPackets;
-import com.deltasf.createpropulsion.physics_assembler.packets.AssemblyFailedPacket;
-import com.simibubi.create.compat.computercraft.AbstractComputerBehaviour;
-import com.simibubi.create.foundation.blockEntity.SmartBlockEntity;
-import com.simibubi.create.foundation.blockEntity.behaviour.BlockEntityBehaviour;
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Optional;
+import java.util.Set;
 
 @SuppressWarnings("null")
 public class PhysicsAssemblerBlockEntity extends SmartBlockEntity {
@@ -112,12 +109,12 @@ public class PhysicsAssemblerBlockEntity extends SmartBlockEntity {
         String dimensionId = VSGameUtilsKt.getDimensionId(level);
         Vector3d gc = region.geometricCenter;
         BlockPos creationAnchorPos = new BlockPos(
-            (int) Math.floor(gc.x),
-            (int) Math.floor(gc.y),
-            (int) Math.floor(gc.z)
+                (int) Math.floor(gc.x),
+                (int) Math.floor(gc.y),
+                (int) Math.floor(gc.z)
         );
         ServerShip ship = VSGameUtilsKt.getShipObjectWorld(level).createNewShipAtBlock(
-            VectorConversionsMCKt.toJOML(creationAnchorPos), false, 1, dimensionId);
+                VectorConversionsMCKt.toJOML(creationAnchorPos), false, 1, dimensionId);
         ChunkClaim claim = ship.getChunkClaim();
         BlockPos newShipInternalCenterPos = VectorConversionsMCKt.toBlockPos(
                 claim.getCenterBlockCoordinates(VSGameUtilsKt.getYRange(level), new Vector3i()));
@@ -141,8 +138,25 @@ public class PhysicsAssemblerBlockEntity extends SmartBlockEntity {
             ChunkPos pos = dit.next();
             destchunkPoses.add(new Vector2i(pos.x, pos.z));
         }
-        //Send packets to stop updating chunks 
+        //Send packets to stop updating chunks
         ValkyrienSkiesMod.getVsCore().getSimplePacketNetworking().sendToAllClients(new PacketStopChunkUpdates(chunkPoses));
+
+        // Pre-pass: tell multiblock thrusters in the region to skip their
+        // disassembly hook. Their controllerPos is stored as a relative
+        // offset in NBT, so the cube's internal geometry survives the
+        // coordinate translation -- but we still need to prevent the old
+        // BEs from tearing down the multi on their way out, since any
+        // incidental setBlockState->onRemove path (now or in the future)
+        // would call disassembleMulti() on the old controller. The flag
+        // is a one-shot: every call consumes the next disassembleMulti on
+        // that BE and no more. Non-thruster BEs are unaffected.
+        for (BlockPos pos : region.blockPositions) {
+            BlockEntity be = level.getBlockEntity(pos);
+            if (be instanceof ThrusterBlockEntity thruster) {
+                thruster.preventNextDisassembly();
+            }
+        }
+
         //Copy blocks from region to shipyard
         for (BlockPos pos : region.blockPositions) {
             BlockPos relative = pos.subtract(creationAnchorPos);
@@ -153,7 +167,7 @@ public class PhysicsAssemblerBlockEntity extends SmartBlockEntity {
         for (BlockPos pos : region.blockPositions) {
             removeBlock(level, pos);
         }
-        //Trigger updates 
+        //Trigger updates
         for (BlockPos pos : region.blockPositions) {
             BlockPos relative = pos.subtract(creationAnchorPos);
             BlockPos shipPos = newShipInternalCenterPos.offset(relative);
@@ -168,8 +182,8 @@ public class PhysicsAssemblerBlockEntity extends SmartBlockEntity {
         Vector3d creationAnchorPosVec = VectorConversionsMCKt.toJOMLD(creationAnchorPos);
 
         Vector3d shipComInWorld = new Vector3d(comInShip)
-            .sub(newShipInternalCenterPosVec)
-            .add(creationAnchorPosVec);
+                .sub(newShipInternalCenterPosVec)
+                .add(creationAnchorPosVec);
 
         Vector3d finalShipPosInWorld = shipComInWorld.add(0.0,0.0,0.0);
         Quaterniondc finalShipRotation = new Quaterniond();
@@ -190,12 +204,12 @@ public class PhysicsAssemblerBlockEntity extends SmartBlockEntity {
         }
 
         BodyKinematics newShipTransform = ValkyrienSkies.api().newBodyKinematics(
-            new Vector3d(),
-            new Vector3d(),
-            finalShipPosInWorld,
-            finalShipRotation,
-            finalShipScale,
-            finalShipPosInShipyard
+                new Vector3d(),
+                new Vector3d(),
+                finalShipPosInWorld,
+                finalShipRotation,
+                finalShipScale,
+                finalShipPosInShipyard
         );
 
         //final String vsDimName = VSGameUtilsKt.getDimensionId(world);
@@ -217,12 +231,12 @@ public class PhysicsAssemblerBlockEntity extends SmartBlockEntity {
         }
 
         //Sync FROM chunks to resume updated when TO chunks start to tick
-        VSGameUtilsKt.executeIf(level.getServer(), 
-            () -> destchunkPoses.stream().allMatch(chunkPos -> VSGameUtilsKt.isTickingChunk(level, chunkPos.x, chunkPos.y)), 
-            () -> {
-                ValkyrienSkiesMod.getVsCore().getSimplePacketNetworking().sendToAllClients(new PacketRestartChunkUpdates(chunkPoses));
-                chunkPoses.clear();
-            }
+        VSGameUtilsKt.executeIf(level.getServer(),
+                () -> destchunkPoses.stream().allMatch(chunkPos -> VSGameUtilsKt.isTickingChunk(level, chunkPos.x, chunkPos.y)),
+                () -> {
+                    ValkyrienSkiesMod.getVsCore().getSimplePacketNetworking().sendToAllClients(new PacketRestartChunkUpdates(chunkPoses));
+                    chunkPoses.clear();
+                }
         );
     }
 
@@ -351,8 +365,8 @@ public class PhysicsAssemblerBlockEntity extends SmartBlockEntity {
         int maxZ = Math.max(posA.getZ(), posB.getZ());
 
         if (selfPos.getX() >= minX && selfPos.getX() <= maxX &&
-            selfPos.getY() >= minY && selfPos.getY() <= maxY &&
-            selfPos.getZ() >= minZ && selfPos.getZ() <= maxZ) {
+                selfPos.getY() >= minY && selfPos.getY() <= maxY &&
+                selfPos.getZ() >= minZ && selfPos.getZ() <= maxZ) {
             Component reason = Component.translatable("createpropulsion.assembler.selection.cannot_be_inside").withStyle(s -> s.withColor(AssemblyUtility.CANCEL_COLOR));
             return new GaugeValidationResult(false, Optional.of(reason));
         }
@@ -360,7 +374,7 @@ public class PhysicsAssemblerBlockEntity extends SmartBlockEntity {
         //Check distance between assembler and region
         int manhattanDistance = getManhattanDistanceToRegion(this.worldPosition, posA, posB);
         if (manhattanDistance > PropulsionConfig.PHYSICS_ASSEMBLER_MAX_MINK_DISTANCE.get()) {
-             Component reason = Component.translatable("createpropulsion.assembler.selection.too_far").withStyle(s -> s.withColor(AssemblyUtility.CANCEL_COLOR));
+            Component reason = Component.translatable("createpropulsion.assembler.selection.too_far").withStyle(s -> s.withColor(AssemblyUtility.CANCEL_COLOR));
             return new GaugeValidationResult(false, Optional.of(reason));
         }
 
@@ -377,11 +391,11 @@ public class PhysicsAssemblerBlockEntity extends SmartBlockEntity {
         }
 
         ItemStack gaugeInHand = player.getItemInHand(hand);
-        
+
         if (!(gaugeInHand.getItem() instanceof AssemblyGaugeItem) || !itemHandler.getStackInSlot(0).isEmpty()) {
             return;
         }
-        
+
         ItemStack gaugeToInsert = gaugeInHand.copy();
         gaugeToInsert.setCount(1);
         itemHandler.setStackInSlot(0, gaugeToInsert);
@@ -442,7 +456,7 @@ public class PhysicsAssemblerBlockEntity extends SmartBlockEntity {
         BlockPos point = this.worldPosition;
         int distX = Math.max(0, minX - point.getX()) + Math.max(0, point.getX() - maxX);
         int distZ = Math.max(0, minZ - point.getZ()) + Math.max(0, point.getZ() - maxZ);
-        
+
         if (distZ >= distX) {
             return 0.0f;
         }
@@ -465,7 +479,7 @@ public class PhysicsAssemblerBlockEntity extends SmartBlockEntity {
             double py = center.y + (face.getStepY() * 0.55);
             double pz = center.z + (face.getStepZ() * 0.55);
             float spread = 0.9f;
-            
+
             if (face.getAxis() != Direction.Axis.X) {
                 px += (r.nextFloat() - 0.5f) * spread;
             }
@@ -553,9 +567,9 @@ public class PhysicsAssemblerBlockEntity extends SmartBlockEntity {
     public record GaugeValidationResult(boolean isValid, Optional<Component> reason) {}
 
     private record SelectedRegion (
-        Vector3d geometricCenter,
-        boolean hasBlocks,
-        List<BlockPos> blockPositions,
-        Set<ChunkPos> chunkPosSet
+            Vector3d geometricCenter,
+            boolean hasBlocks,
+            List<BlockPos> blockPositions,
+            Set<ChunkPos> chunkPosSet
     ) {}
 }

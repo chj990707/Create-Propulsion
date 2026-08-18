@@ -142,6 +142,9 @@ dependencies {
     implementation fg.deobf("dev.engine-room.flywheel:flywheel-forge-${minecraft_version}:${flywheel_version}")
     //CDG
     implementation fg.deobf("curse.maven:createdieselgenerators-869316:6920093")
+    // Create Additions
+    implementation fg.deobf("curse.maven:createaddition-439890:7208610")
+
     //TFMG
     implementation fg.deobf("curse.maven:createindustry-693815:7236535")
     //CC
